@@ -1,5 +1,17 @@
 # Wireframes Web Responsivos
 
+## Login
+
+```text
+┌──────────────────────────────┐
+│ [Logo CCB]                   │
+│ Acesso ao sistema            │
+│ Usuário                      │
+│ Senha                        │
+│ [Entrar]                     │
+└──────────────────────────────┘
+```
+
 ## Evento
 
 ```text
@@ -9,8 +21,11 @@
 ├──────────────────────────────┤
 │ Evento do dia                │
 │ Nome do evento               │
+│ Tipo de evento               │
 │ Data                         │
 │ Local                        │
+│ Encarregado Regional         │
+│ Ancião                       │
 │ Região                       │
 │ Nome deste aparelho          │
 └──────────────────────────────┘
@@ -30,6 +45,15 @@
 │ Violas                       │
 │ [-]          000          [+]│
 └──────────────────────────────┘
+```
+
+Na `Reunião de encarregados e instrutores`, os grupos instrumentais permanecem, mas os itens aparecem como instrutores por instrumento:
+
+```text
+Cordas
+  Instrutores - Violinos
+  Instrutores - Violas
+  Instrutores - Violoncelos
 ```
 
 ## Consolidação Sem Servidor
@@ -61,5 +85,23 @@
 ├──────────────────────────────┤
 │ Tabelas por grupo            │
 │ Cordas | Teclas | Madeiras   │
+└──────────────────────────────┘
+```
+
+## Administração
+
+```text
+┌──────────────────────────────┐
+│ Administração                │
+│ Usuários e perfis            │
+│ Nome | Usuário | Senha       │
+│ Perfil: Administrador        │
+│ [Salvar usuário]             │
+│ Ações: Editar | Resetar senha │
+├──────────────────────────────┤
+│ [Exportar logs] [Limpar]     │
+├──────────────────────────────┤
+│ Data | Usuário | Ação        │
+│ ...                          │
 └──────────────────────────────┘
 ```

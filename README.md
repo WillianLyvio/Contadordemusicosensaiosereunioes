@@ -29,6 +29,41 @@ O sistema usa `localStorage` no próprio navegador. Isso significa:
 - não existe dependência de Firebase ou outro backend;
 - o relatório final é feito em um aparelho coordenador.
 
+## Login e Perfis
+
+O controle de acesso é local, definido no próprio JavaScript em `public/assets/js/app.js`.
+
+Usuários padrão:
+
+```text
+admin / admin123
+contador / contador123
+```
+
+Perfis:
+
+- `administrador`: acessa a página Admin e os logs.
+- `contador`: acessa evento, contagem, consolidação e relatório.
+
+Importante: como o sistema não usa servidor, esse login serve para controle operacional no aparelho. Para segurança forte seria necessário backend.
+
+## Logs de Acesso
+
+Os logs são salvos no `localStorage` do navegador em que o sistema está sendo usado. A página `Admin` permite:
+
+- criar usuários;
+- editar nome, senha e perfil;
+- resetar senha dos usuários;
+- excluir usuários;
+- visualizar logins, logouts, troca de telas e ações principais;
+- exportar logs em JSON;
+- limpar logs locais.
+
+Perfis administráveis:
+
+- `Administrador`: gerencia usuários, perfis e logs.
+- `Contador`: registra contagens, consolida arquivos e gera relatório.
+
 Fluxo recomendado:
 
 1. Abra o sistema em todos os celulares.

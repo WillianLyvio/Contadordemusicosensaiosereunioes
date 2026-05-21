@@ -9,7 +9,25 @@
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
-  <div class="app-shell">
+  <section class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+      <img src="assets/img/logo-ccb-light.svg?v=20260521-1520" alt="Congregação Cristã no Brasil">
+      <h1>Acesso ao sistema</h1>
+      <p>Informe seu usuário e senha para continuar.</p>
+      <label>
+        <span>Usuário</span>
+        <input id="loginUser" type="text" autocomplete="username" required>
+      </label>
+      <label>
+        <span>Senha</span>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="button primary block" type="submit">Entrar</button>
+      <div class="login-error" id="loginError" role="alert"></div>
+    </form>
+  </section>
+
+  <div class="app-shell is-hidden" id="appShell">
     <header class="app-header">
       <div class="brand">
         <img src="assets/img/logo-ccb-light.svg?v=20260521-1520" alt="Congregação Cristã no Brasil" class="brand-logo">
@@ -19,11 +37,15 @@
         </div>
       </div>
       <div class="header-actions">
+        <span class="user-chip" id="currentUserChip"></span>
         <button class="icon-button" type="button" data-action="save" title="Salvar">
           Salvar
         </button>
         <button class="icon-button primary" type="button" data-action="print" title="Imprimir relatório">
           PDF
+        </button>
+        <button class="icon-button" type="button" data-action="logout" title="Sair">
+          Sair
         </button>
       </div>
     </header>
@@ -33,6 +55,7 @@
       <button class="tab" type="button" data-tab="count">Contagem</button>
       <button class="tab" type="button" data-tab="sync">Consolidar</button>
       <button class="tab" type="button" data-tab="report">Relatório</button>
+      <button class="tab admin-only" type="button" data-tab="admin">Admin</button>
     </nav>
 
     <main class="content">
@@ -48,12 +71,27 @@
             <input id="eventName" type="text" autocomplete="off">
           </label>
           <label>
+            <span>Tipo de evento</span>
+            <select id="eventType">
+              <option value="Reunião de encarregados e instrutores">Reunião de encarregados e instrutores</option>
+              <option value="Ensaio Regional">Ensaio Regional</option>
+            </select>
+          </label>
+          <label>
             <span>Data</span>
             <input id="eventDate" type="date">
           </label>
           <label>
             <span>Local</span>
             <input id="eventLocal" type="text" autocomplete="off">
+          </label>
+          <label class="conditional-leader-field is-hidden" id="regionalLeaderField">
+            <span id="regionalLeaderLabel">Nome do Encarregado Regional</span>
+            <input id="eventRegionalLeader" type="text" autocomplete="off">
+          </label>
+          <label class="conditional-leader-field is-hidden" id="elderField">
+            <span id="elderLabel">Nome do Ancião</span>
+            <input id="eventElder" type="text" autocomplete="off">
           </label>
           <label>
             <span>Região</span>
@@ -157,6 +195,87 @@
             <strong>Observações:</strong>
             relatório consolidado localmente a partir das contagens do dia importadas dos aparelhos participantes.
           </footer>
+        </article>
+      </section>
+
+      <section class="view" id="view-admin">
+        <div class="section-heading">
+          <h1>Administração</h1>
+          <p>Controle local de acessos registrados neste navegador.</p>
+        </div>
+
+        <div class="admin-actions">
+          <button class="button" type="button" data-action="export-logs">Exportar logs JSON</button>
+          <button class="button subtle" type="button" data-action="clear-logs">Limpar logs</button>
+        </div>
+
+        <article class="panel admin-panel">
+          <div class="panel-title-row">
+            <h2>Usuários e perfis</h2>
+            <span class="muted">Gerenciamento local deste aparelho</span>
+          </div>
+
+          <form class="user-form" id="userForm">
+            <input id="userEditKey" type="hidden">
+            <label>
+              <span>Nome</span>
+              <input id="userName" type="text" autocomplete="off" required>
+            </label>
+            <label>
+              <span>Usuário</span>
+              <input id="userUsername" type="text" autocomplete="off" required>
+            </label>
+            <label>
+              <span>Senha</span>
+              <input id="userPassword" type="password" autocomplete="new-password" placeholder="Obrigatória para novo usuário">
+            </label>
+            <label>
+              <span>Perfil</span>
+              <select id="userRole">
+                <option value="contador">Contador</option>
+                <option value="administrador">Administrador</option>
+              </select>
+            </label>
+            <div class="user-form-actions">
+              <button class="button primary" type="submit">Salvar usuário</button>
+              <button class="button subtle" type="button" id="cancelUserEdit">Cancelar edição</button>
+            </div>
+          </form>
+
+          <div class="log-table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Usuário</th>
+                  <th>Perfil</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="userTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title-row">
+            <h2>Logs de acesso</h2>
+            <span class="muted" id="logCount"></span>
+          </div>
+          <div class="log-table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Usuário</th>
+                  <th>Perfil</th>
+                  <th>Ação</th>
+                  <th>Detalhes</th>
+                </tr>
+              </thead>
+              <tbody id="logTableBody"></tbody>
+            </table>
+          </div>
         </article>
       </section>
     </main>
