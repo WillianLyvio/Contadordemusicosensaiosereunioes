@@ -12,6 +12,7 @@ public/
   index.html                Entrada estática sem PHP
   manifest.webmanifest      Configuração PWA
   service-worker.js         Cache offline
+  api/users.php             Grava usuários no JSON quando rodar com PHP
   data/users.json           Usuários consultados no login
   assets/
     css/app.css             Interface responsiva branco/cinza
@@ -41,7 +42,7 @@ admin / admin123
 contador / contador123
 ```
 
-Para cadastrar usuários que já funcionem em qualquer aparelho, adicione novos objetos em `public/data/users.json` e publique a atualização. Usuários criados pela tela `Admin` continuam salvos apenas no navegador local.
+Quando o sistema estiver rodando com PHP, usuários criados, editados, excluídos ou com senha resetada na tela `Admin` atualizam `public/data/users.json` e passam a funcionar em qualquer aparelho que abrir a mesma instalação. Se o sistema estiver aberto como site estático, o navegador não consegue gravar arquivos do projeto; nesse caso o usuário fica salvo apenas no aparelho local.
 
 Perfis:
 
@@ -52,9 +53,9 @@ Importante: como o sistema não usa servidor, esse login serve para controle ope
 
 ## Login Em Outro Aparelho
 
-Usuários cadastrados em `public/data/users.json` já ficam disponíveis em qualquer aparelho que abrir a versão atualizada do sistema.
+Usuários cadastrados em `public/data/users.json` já ficam disponíveis em qualquer aparelho que abrir a mesma instalação do sistema. Se o Admin estiver usando a versão com PHP, novos usuários entram nesse arquivo automaticamente.
 
-Como o sistema não usa servidor nem banco de dados central, os usuários criados pela tela `Admin` ficam salvos apenas no navegador daquele aparelho. Para levar esses usuários locais para outro celular:
+Se estiver usando apenas a versão estática, sem PHP, os usuários criados pela tela `Admin` ficam salvos apenas no navegador daquele aparelho. Para levar esses usuários locais para outro celular:
 
 1. Entre como `admin` no aparelho principal.
 2. Acesse `Admin`.

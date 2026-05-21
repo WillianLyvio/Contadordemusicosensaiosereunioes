@@ -6,6 +6,7 @@
   const ACCESS_LOG_KEY = 'contador-musicos-access-logs-v1';
   const USER_STORAGE_KEY = 'contador-musicos-users-v1';
   const USER_DATA_URL = 'data/users.json';
+  const USER_API_URL = 'api/users.php';
   const FALLBACK_USER_ACCOUNTS = [
     {
       username: 'admin',
@@ -21,6 +22,7 @@
     },
   ];
   let projectUserAccounts = [];
+  let adminFilePassword = '';
 
   const catalog = [
     {
@@ -271,22 +273,22 @@
   }
 
   function bindUserManagement() {
-    document.getElementById('userForm').addEventListener('submit', (event) => {
+    document.getElementById('userForm').addEventListener('submit', async (event) => {
       event.preventDefault();
-      saveUserFromForm();
+      await saveUserFromForm();
     });
 
     document.getElementById('cancelUserEdit').addEventListener('click', resetUserForm);
     document.getElementById('adminImportUsers').addEventListener('change', importUsersFile);
 
-    document.getElementById('userTableBody').addEventListener('click', (event) => {
+    document.getElementById('userTableBody').addEventListener('click', async (event) => {
       const button = event.target.closest('[data-user-action]');
       if (!button) return;
 
       const username = button.dataset.username;
       if (button.dataset.userAction === 'edit') editUser(username);
-      if (button.dataset.userAction === 'reset-password') resetUserPassword(username);
-      if (button.dataset.userAction === 'delete') deleteUser(username);
+      if (button.dataset.userAction === 'reset-password') await resetUserPassword(username);
+      if (button.dataset.userAction === 'delete') await deleteUser(username);
     });
   }
 
@@ -364,6 +366,45 @@
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(localUsers));
   }
 
+  async function syncUsersFile(users) {
+    if (!isAdmin()) return false;
+
+    const adminPassword = requestAdminFilePassword();
+    if (adminPassword === null) return false;
+
+    const response = await fetch(USER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        adminUsername: currentUser.username,
+        adminPassword,
+        users: uniqueUsers(users),
+      }),
+    });
+
+    const packet = await response.json().catch(() => ({}));
+    if (!response.ok || packet.ok !== true) {
+      if (response.status === 403) adminFilePassword = '';
+      throw new Error(packet.message || 'Nao foi possivel atualizar data/users.json.');
+    }
+
+    projectUserAccounts = normalizeUserList(packet.users);
+    saveUserAccounts(projectUserAccounts);
+    return true;
+  }
+
+  function requestAdminFilePassword() {
+    if (adminFilePassword) return adminFilePassword;
+
+    const password = window.prompt('Informe a senha do administrador para atualizar data/users.json:');
+    if (password === null) return null;
+
+    adminFilePassword = password;
+    return adminFilePassword;
+  }
+
   function exportUsers() {
     if (!isAdmin()) {
       showToast('Acesso permitido apenas para administrador.');
@@ -405,11 +446,23 @@
         ...readUserAccounts(),
         ...normalizedImportedUsers,
       ]);
+      const importedFromAdmin = event.target.id === 'adminImportUsers' && isAdmin();
+      let savedGlobally = false;
+      if (importedFromAdmin) {
+        try {
+          savedGlobally = await syncUsersFile(mergedUsers);
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
       saveUserAccounts(mergedUsers);
       writeAccessLog('import_users', `${normalizedImportedUsers.length} usuário(s) importado(s)`);
       renderLoginGroupRequirement();
       if (currentUser) render();
-      showToast(`${normalizedImportedUsers.length} usuário(s) importado(s).`);
+      showToast(savedGlobally
+        ? `${normalizedImportedUsers.length} usuario(s) importado(s) no arquivo.`
+        : `${normalizedImportedUsers.length} usuario(s) importado(s) neste aparelho.`);
     } catch (error) {
       showToast('Não foi possível importar usuários.');
     } finally {
@@ -559,7 +612,7 @@
     showToast('Logs limpos.');
   }
 
-  function saveUserFromForm() {
+  async function saveUserFromForm() {
     if (!isAdmin()) {
       showToast('Acesso permitido apenas para administrador.');
       return;
@@ -583,11 +636,6 @@
 
     if (!name) {
       showToast('Informe o nome do usuário.');
-      return;
-    }
-
-    if (isProjectFileUser(username) || isProjectFileUser(editKey)) {
-      showToast('Usuario salvo no arquivo. Edite em data/users.json.');
       return;
     }
 
@@ -618,6 +666,18 @@
       return;
     }
 
+    let savedGlobally = false;
+    try {
+      savedGlobally = await syncUsersFile(nextUsers);
+    } catch (error) {
+      showToast(error.message);
+    }
+
+    if (!savedGlobally && (isProjectFileUser(username) || isProjectFileUser(editKey))) {
+      showToast('Nao foi possivel atualizar o usuario no arquivo.');
+      return;
+    }
+
     saveUserAccounts(nextUsers);
 
     if (currentUser?.username === editKey || currentUser?.username === username) {
@@ -637,7 +697,9 @@
     writeAccessLog(existing ? 'update_user' : 'create_user', username);
     resetUserForm();
     render();
-    showToast(existing ? 'Usuário atualizado.' : 'Usuário criado.');
+    showToast(savedGlobally
+      ? (existing ? 'Usuario atualizado no arquivo.' : 'Usuario criado no arquivo.')
+      : (existing ? 'Usuario atualizado neste aparelho.' : 'Usuario criado neste aparelho.'));
   }
 
   function editUser(username) {
@@ -654,7 +716,7 @@
     document.getElementById('userRole').value = user.role;
   }
 
-  function deleteUser(username) {
+  async function deleteUser(username) {
     if (!isAdmin()) return;
 
     if (username === currentUser.username) {
@@ -662,14 +724,10 @@
       return;
     }
 
-    if (isProjectFileUser(username)) {
-      showToast('Usuario salvo no arquivo. Remova em data/users.json.');
-      return;
-    }
-
     const users = readUserAccounts();
     const user = users.find((item) => item.username === username);
     if (!user) return;
+    const projectUser = isProjectFileUser(username);
 
     const nextUsers = users.filter((item) => item.username !== username);
     if (!nextUsers.some((item) => item.role === 'administrador')) {
@@ -680,24 +738,32 @@
     const confirmation = window.confirm(`Deseja excluir o usuário ${user.name}?`);
     if (!confirmation) return;
 
+    let savedGlobally = false;
+    try {
+      savedGlobally = await syncUsersFile(nextUsers);
+    } catch (error) {
+      showToast(error.message);
+    }
+
+    if (!savedGlobally && projectUser) {
+      showToast('Nao foi possivel excluir o usuario do arquivo.');
+      return;
+    }
+
     saveUserAccounts(nextUsers);
     writeAccessLog('delete_user', username);
     resetUserForm();
     render();
-    showToast('Usuário excluído.');
+    showToast(savedGlobally ? 'Usuario excluido do arquivo.' : 'Usuario excluido deste aparelho.');
   }
 
-  function resetUserPassword(username) {
+  async function resetUserPassword(username) {
     if (!isAdmin()) return;
-
-    if (isProjectFileUser(username)) {
-      showToast('Usuario salvo no arquivo. Edite em data/users.json.');
-      return;
-    }
 
     const users = readUserAccounts();
     const user = users.find((item) => item.username === username);
     if (!user) return;
+    const projectUser = isProjectFileUser(username);
 
     const newPassword = window.prompt(`Informe a nova senha para ${user.name}:`);
     if (newPassword === null) return;
@@ -712,10 +778,22 @@
         ? {...item, password: newPassword.trim()}
         : item
     ));
+    let savedGlobally = false;
+    try {
+      savedGlobally = await syncUsersFile(updatedUsers);
+    } catch (error) {
+      showToast(error.message);
+    }
+
+    if (!savedGlobally && projectUser) {
+      showToast('Nao foi possivel redefinir a senha no arquivo.');
+      return;
+    }
+
     saveUserAccounts(updatedUsers);
     writeAccessLog('reset_password', username);
     render();
-    showToast('Senha redefinida.');
+    showToast(savedGlobally ? 'Senha redefinida no arquivo.' : 'Senha redefinida neste aparelho.');
   }
 
   function resetUserForm() {
@@ -1150,9 +1228,9 @@
           <td>${escapeHtml(roleLabel(user.role))}${projectUser ? ' <span class="source-tag">arquivo</span>' : ''}</td>
           <td>
             <div class="table-actions">
-              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Editar</button>
-              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Resetar senha</button>
-              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Excluir</button>
+              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}">Editar</button>
+              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}">Resetar senha</button>
+              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}">Excluir</button>
             </div>
           </td>
         </tr>

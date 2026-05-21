@@ -58,7 +58,9 @@ Os usuários base ficam no arquivo:
 public/data/users.json
 ```
 
-Esse arquivo é consultado em cada tentativa de login e seus usuários funcionam em qualquer aparelho que abrir a versão publicada. Usuários criados pela tela `Admin` continuam locais e ficam em:
+Esse arquivo é consultado em cada tentativa de login e seus usuários funcionam em qualquer aparelho que abrir a mesma instalação.
+
+Quando o sistema roda com PHP, a tela `Admin` chama `public/api/users.php` para gravar alterações nesse arquivo. Quando roda sem PHP, usuários criados pela tela `Admin` continuam locais e ficam em:
 
 ```text
 contador-musicos-users-v1

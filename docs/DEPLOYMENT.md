@@ -30,17 +30,22 @@ Com PHP:
 php -S 127.0.0.1:8790 -t public
 ```
 
+Use a opção com PHP quando quiser que a tela `Admin` grave novos usuários diretamente em `public/data/users.json`.
+
 Observação: `127.0.0.1` abre apenas no próprio computador. Para testar em um celular na mesma rede, use o IP do computador no Wi-Fi, por exemplo `http://192.168.0.10:8790`.
 
 ## Opção 3: Hospedagem Estática
 
 Pode hospedar a pasta `public/` em qualquer hospedagem simples, inclusive sem banco de dados.
 
+Em hospedagem estática, a tela `Admin` não consegue gravar `public/data/users.json`; os usuários criados ficam apenas no navegador local. Para gravação central do arquivo, use uma hospedagem com PHP e permissão de escrita na pasta `public/data/`.
+
 Arquivos necessários:
 
 ```text
 public/index.html
 public/index.php
+public/api/users.php
 public/data/users.json
 public/assets/css/app.css
 public/assets/js/app.js
@@ -61,9 +66,9 @@ public/service-worker.js
 
 ## Usuários Em Vários Celulares
 
-Os usuários cadastrados em `public/data/users.json` ficam salvos no projeto e passam a funcionar em qualquer aparelho depois que a versão atualizada for publicada. O sistema consulta esse arquivo em cada tentativa de login.
+Os usuários cadastrados em `public/data/users.json` ficam salvos no projeto e passam a funcionar em qualquer aparelho que abrir a mesma instalação. O sistema consulta esse arquivo em cada tentativa de login.
 
-Sem servidor, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar esses usuários locais em outro celular:
+Com PHP, a tela `Admin` atualiza esse arquivo automaticamente ao criar, editar, excluir ou resetar senhas. Sem PHP, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar esses usuários locais em outro celular:
 
 1. No aparelho principal, entre como administrador.
 2. Acesse `Admin` e clique em `Exportar usuários JSON`.
