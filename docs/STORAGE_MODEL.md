@@ -52,7 +52,13 @@ Estrutura:
 
 ## Usuários
 
-Os usuários administráveis ficam em:
+Os usuários base ficam no código em:
+
+```text
+public/assets/js/users.js
+```
+
+Esses usuários funcionam em qualquer aparelho que abrir a versão publicada. Usuários criados pela tela `Admin` continuam locais e ficam em:
 
 ```text
 contador-musicos-users-v1

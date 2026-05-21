@@ -5,7 +5,9 @@
   const AUTH_SESSION_KEY = 'contador-musicos-auth-v1';
   const ACCESS_LOG_KEY = 'contador-musicos-access-logs-v1';
   const USER_STORAGE_KEY = 'contador-musicos-users-v1';
-  const DEFAULT_USER_ACCOUNTS = [
+  const CODE_USER_ACCOUNTS = Array.isArray(window.APP_USER_ACCOUNTS) && window.APP_USER_ACCOUNTS.length > 0
+    ? window.APP_USER_ACCOUNTS
+    : [
     {
       username: 'admin',
       password: 'admin123',
@@ -287,29 +289,31 @@
   function readUserAccounts() {
     try {
       const stored = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '[]');
-      if (!Array.isArray(stored) || stored.length === 0) {
-        saveUserAccounts(DEFAULT_USER_ACCOUNTS);
-        return [...DEFAULT_USER_ACCOUNTS];
-      }
-
-      const normalized = stored
-        .filter((user) => user?.username && user?.password && user?.role)
-        .map((user) => ({
-          username: normalizeUsername(user.username),
-          password: String(user.password),
-          name: String(user.name || user.username),
-          role: normalizeRole(user.role),
-        }));
+      const storedUsers = Array.isArray(stored) ? stored : [];
+      const normalized = uniqueUsers([...storedUsers, ...codeUserAccounts()]);
 
       if (!normalized.some((user) => user.role === 'administrador')) {
-        normalized.unshift(DEFAULT_USER_ACCOUNTS[0]);
+        normalized.unshift(codeUserAccounts()[0]);
       }
 
+      saveUserAccounts(normalized);
       return uniqueUsers(normalized);
     } catch (error) {
-      saveUserAccounts(DEFAULT_USER_ACCOUNTS);
-      return [...DEFAULT_USER_ACCOUNTS];
+      const fallback = codeUserAccounts();
+      saveUserAccounts(fallback);
+      return fallback;
     }
+  }
+
+  function codeUserAccounts() {
+    return uniqueUsers(CODE_USER_ACCOUNTS.filter((user) => (
+      user?.username && user?.password && user?.role
+    )));
+  }
+
+  function isCodeUser(username) {
+    const key = normalizeUsername(username);
+    return codeUserAccounts().some((user) => user.username === key);
   }
 
   function saveUserAccounts(users) {
@@ -538,6 +542,11 @@
       return;
     }
 
+    if (isCodeUser(username) || isCodeUser(editKey)) {
+      showToast('Usuario salvo no codigo. Edite em assets/js/users.js.');
+      return;
+    }
+
     const users = readUserAccounts();
     const existing = users.find((user) => user.username === (editKey || username));
     const duplicate = users.some((user) => user.username === username && user.username !== editKey);
@@ -609,6 +618,11 @@
       return;
     }
 
+    if (isCodeUser(username)) {
+      showToast('Usuario salvo no codigo. Remova em assets/js/users.js.');
+      return;
+    }
+
     const users = readUserAccounts();
     const user = users.find((item) => item.username === username);
     if (!user) return;
@@ -631,6 +645,11 @@
 
   function resetUserPassword(username) {
     if (!isAdmin()) return;
+
+    if (isCodeUser(username)) {
+      showToast('Usuario salvo no codigo. Edite em assets/js/users.js.');
+      return;
+    }
 
     const users = readUserAccounts();
     const user = users.find((item) => item.username === username);
@@ -1079,16 +1098,17 @@
 
     document.getElementById('userTableBody').innerHTML = users.map((user) => {
       const isCurrent = currentUser?.username === user.username;
+      const codeUser = isCodeUser(user.username);
       return `
         <tr>
           <td>${escapeHtml(user.name)}${isCurrent ? ' <strong>(logado)</strong>' : ''}</td>
           <td>${escapeHtml(user.username)}</td>
-          <td>${escapeHtml(roleLabel(user.role))}</td>
+          <td>${escapeHtml(roleLabel(user.role))}${codeUser ? ' <span class="source-tag">codigo</span>' : ''}</td>
           <td>
             <div class="table-actions">
-              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}">Editar</button>
-              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}">Resetar senha</button>
-              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}">Excluir</button>
+              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Editar</button>
+              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Resetar senha</button>
+              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Excluir</button>
             </div>
           </td>
         </tr>

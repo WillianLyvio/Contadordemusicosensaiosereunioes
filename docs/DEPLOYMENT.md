@@ -42,6 +42,7 @@ Arquivos necessários:
 public/index.html
 public/index.php
 public/assets/css/app.css
+public/assets/js/users.js
 public/assets/js/app.js
 public/assets/img/logo-ccb-light.svg
 public/assets/img/logo-ccb.svg
@@ -60,7 +61,9 @@ public/service-worker.js
 
 ## Usuários Em Vários Celulares
 
-Sem servidor, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar acesso em outro celular:
+Os usuários cadastrados em `public/assets/js/users.js` ficam salvos no código e passam a funcionar em qualquer aparelho depois que a versão atualizada for publicada.
+
+Sem servidor, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar esses usuários locais em outro celular:
 
 1. No aparelho principal, entre como administrador.
 2. Acesse `Admin` e clique em `Exportar usuários JSON`.

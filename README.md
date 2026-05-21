@@ -14,6 +14,7 @@ public/
   service-worker.js         Cache offline
   assets/
     css/app.css             Interface responsiva branco/cinza
+    js/users.js             Usuários salvos no código do app
     js/app.js               Contagem, armazenamento e relatório
     img/logo-ccb-light.svg  Logo correta usada no sistema
     img/logo-ccb.svg        Alias do mesmo arquivo para compatibilidade
@@ -31,14 +32,16 @@ O sistema usa `localStorage` no próprio navegador. Isso significa:
 
 ## Login e Perfis
 
-O controle de acesso é local, definido no próprio JavaScript em `public/assets/js/app.js`.
+O controle de acesso carrega uma lista base definida no código em `public/assets/js/users.js`.
 
-Usuários padrão:
+Usuários salvos no código:
 
 ```text
 admin / admin123
 contador / contador123
 ```
+
+Para cadastrar usuários que já funcionem em qualquer aparelho, adicione novos objetos nesse arquivo e publique a atualização. Usuários criados pela tela `Admin` continuam salvos apenas no navegador local.
 
 Perfis:
 
@@ -49,7 +52,9 @@ Importante: como o sistema não usa servidor, esse login serve para controle ope
 
 ## Login Em Outro Aparelho
 
-Como o sistema não usa servidor nem banco de dados central, os usuários criados pelo administrador ficam salvos apenas no navegador daquele aparelho. Para usar os mesmos logins em outro celular:
+Usuários cadastrados em `public/assets/js/users.js` já ficam disponíveis em qualquer aparelho que abrir a versão atualizada do sistema.
+
+Como o sistema não usa servidor nem banco de dados central, os usuários criados pela tela `Admin` ficam salvos apenas no navegador daquele aparelho. Para levar esses usuários locais para outro celular:
 
 1. Entre como `admin` no aparelho principal.
 2. Acesse `Admin`.

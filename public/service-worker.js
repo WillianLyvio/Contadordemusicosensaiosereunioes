@@ -1,8 +1,9 @@
-const CACHE_NAME = 'contador-musicos-web-v14';
+const CACHE_NAME = 'contador-musicos-web-v15';
 const ASSETS = [
   './',
   './index.html',
   './assets/css/app.css',
+  './assets/js/users.js',
   './assets/js/app.js',
   './assets/img/logo-ccb-light.svg',
   './assets/img/logo-ccb.svg',
