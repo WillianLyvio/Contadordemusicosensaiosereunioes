@@ -104,7 +104,7 @@ Cada registro contém:
   "username": "admin",
   "name": "Administrador",
   "role": "administrador",
-  "countGroups": ["cordas", "madeiras"],
+  "countGroups": ["cordas", "madeiras", "organistas"],
   "action": "login_success",
   "details": "Entrada no sistema",
   "deviceName": "Aparelho principal"

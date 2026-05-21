@@ -104,7 +104,7 @@ button {
 
 .login-group-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -883,6 +883,10 @@ select:focus {
 
   .report-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .login-group-options {
+    grid-template-columns: 1fr 1fr;
   }
 
   .chart-row {

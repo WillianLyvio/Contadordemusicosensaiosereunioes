@@ -9,6 +9,8 @@
 │ Usuário                      │
 │ Senha                        │
 │ Grupos para contagem         │
+│ Cordas  Teclas  Madeiras     │
+│ Metais  Organistas ...       │
 │ [Entrar]                     │
 └──────────────────────────────┘
 ```

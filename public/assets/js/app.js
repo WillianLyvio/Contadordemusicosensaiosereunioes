@@ -119,6 +119,16 @@
     'Ensaio Regional',
   ];
   const instrumentGroupIds = ['cordas', 'teclas', 'madeiras', 'metais'];
+  const assignableGroupIds = [
+    'cordas',
+    'teclas',
+    'madeiras',
+    'metais',
+    'organistas',
+    'ministerios',
+    'parte_musical',
+    'oficializacao',
+  ];
 
   let state = loadState();
   let currentUser = loadSession();
@@ -203,7 +213,7 @@
   function selectedLoginCountGroups() {
     return Array.from(document.querySelectorAll('[name="loginCountGroups"]:checked'))
       .map((input) => input.value)
-      .filter((groupId) => instrumentGroupIds.includes(groupId));
+      .filter((groupId) => assignableGroupIds.includes(groupId));
   }
 
   function renderLoginGroupRequirement() {
@@ -326,8 +336,8 @@
 
   function normalizeCountGroups(value) {
     const values = Array.isArray(value) ? value : [value];
-    const groups = values.filter((groupId) => instrumentGroupIds.includes(groupId));
-    return groups.length > 0 ? Array.from(new Set(groups)) : [instrumentGroupIds[0]];
+    const groups = values.filter((groupId) => assignableGroupIds.includes(groupId));
+    return groups.length > 0 ? Array.from(new Set(groups)) : [assignableGroupIds[0]];
   }
 
   function loadSession() {

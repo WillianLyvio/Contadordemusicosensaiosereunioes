@@ -61,6 +61,8 @@ O administrador pode criar, editar, resetar senhas e excluir usuários pela aba 
 
 Usuários com perfil `contador` escolhem um ou mais grupos instrumentais no login. Essa escolha fica na sessão local e limita a aba `Contagem` aos grupos selecionados.
 
+Os grupos atribuíveis ao contador são: Cordas, Teclas, Madeiras, Metais, Organistas, Ministérios e Colaboradores, Parte Musical e Oficialização.
+
 ## Contagem Por Tipo De Evento
 
 - `Ensaio Regional`: mostra todos os grupos de contagem do relatório.

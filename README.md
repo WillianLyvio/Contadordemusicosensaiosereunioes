@@ -66,6 +66,8 @@ Perfis administráveis:
 
 Ao entrar como `contador`, o usuário deve escolher um ou mais grupos instrumentais que vai contar. Na aba `Contagem`, ele verá somente os grupos selecionados. O administrador continua visualizando todos os grupos.
 
+Grupos disponíveis para contadores: Cordas, Teclas, Madeiras, Metais, Organistas, Ministérios e Colaboradores, Parte Musical e Oficialização.
+
 Fluxo recomendado:
 
 1. Abra o sistema em todos os celulares.
