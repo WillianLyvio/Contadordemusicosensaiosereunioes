@@ -22,16 +22,15 @@
         <span>Senha</span>
         <input id="loginPassword" type="password" autocomplete="current-password" required>
       </label>
-      <label class="login-group-field is-hidden" id="loginGroupField">
-        <span>Grupo para contagem</span>
-        <select id="loginCountGroup">
-          <option value="">Selecione o grupo</option>
-          <option value="cordas">Cordas</option>
-          <option value="teclas">Teclas</option>
-          <option value="madeiras">Madeiras</option>
-          <option value="metais">Metais</option>
-        </select>
-      </label>
+      <fieldset class="login-group-field is-hidden" id="loginGroupField">
+        <legend>Grupos para contagem</legend>
+        <div class="login-group-options">
+          <label><input type="checkbox" name="loginCountGroups" value="cordas"> Cordas</label>
+          <label><input type="checkbox" name="loginCountGroups" value="teclas"> Teclas</label>
+          <label><input type="checkbox" name="loginCountGroups" value="madeiras"> Madeiras</label>
+          <label><input type="checkbox" name="loginCountGroups" value="metais"> Metais</label>
+        </div>
+      </fieldset>
       <button class="button primary block" type="submit">Entrar</button>
       <div class="login-error" id="loginError" role="alert"></div>
     </form>

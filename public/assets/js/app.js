@@ -170,12 +170,12 @@
         return;
       }
 
-      const countGroup = account.role === 'contador'
-        ? document.getElementById('loginCountGroup').value
-        : '';
+      const countGroups = account.role === 'contador'
+        ? selectedLoginCountGroups()
+        : [];
 
-      if (account.role === 'contador' && !instrumentGroupIds.includes(countGroup)) {
-        document.getElementById('loginError').textContent = 'Selecione o grupo para contagem.';
+      if (account.role === 'contador' && countGroups.length === 0) {
+        document.getElementById('loginError').textContent = 'Selecione ao menos um grupo para contagem.';
         return;
       }
 
@@ -183,21 +183,27 @@
         username: account.username,
         name: account.name,
         role: account.role,
-        countGroup,
+        countGroups,
         loginAt: new Date().toISOString(),
       };
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
-      if (currentUser.countGroup) {
-        state.selectedGroup = currentUser.countGroup;
+      if (currentUser.countGroups.length > 0) {
+        state.selectedGroup = currentUser.countGroups[0];
         saveState();
       }
       document.getElementById('loginError').textContent = '';
-      writeAccessLog('login_success', currentUser.countGroup
-        ? `Entrada no sistema | Grupo: ${groupLabel(currentUser.countGroup)}`
+      writeAccessLog('login_success', currentUser.countGroups.length > 0
+        ? `Entrada no sistema | Grupos: ${groupLabels(currentUser.countGroups)}`
         : 'Entrada no sistema');
       renderAuth();
       render();
     });
+  }
+
+  function selectedLoginCountGroups() {
+    return Array.from(document.querySelectorAll('[name="loginCountGroups"]:checked'))
+      .map((input) => input.value)
+      .filter((groupId) => instrumentGroupIds.includes(groupId));
   }
 
   function renderLoginGroupRequirement() {
@@ -205,7 +211,11 @@
     const account = readUserAccounts().find((user) => user.username === username);
     const isCounter = account?.role === 'contador';
     document.getElementById('loginGroupField').classList.toggle('is-hidden', !isCounter);
-    document.getElementById('loginCountGroup').required = isCounter;
+    if (!isCounter) {
+      document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
+        input.checked = false;
+      });
+    }
   }
 
   function bindActions() {
@@ -314,6 +324,12 @@
     return role === 'administrador' ? 'administrador' : 'contador';
   }
 
+  function normalizeCountGroups(value) {
+    const values = Array.isArray(value) ? value : [value];
+    const groups = values.filter((groupId) => instrumentGroupIds.includes(groupId));
+    return groups.length > 0 ? Array.from(new Set(groups)) : [instrumentGroupIds[0]];
+  }
+
   function loadSession() {
     try {
       const raw = localStorage.getItem(AUTH_SESSION_KEY);
@@ -327,9 +343,9 @@
         username: account.username,
         name: account.name,
         role: account.role,
-        countGroup: account.role === 'contador'
-          ? (instrumentGroupIds.includes(session.countGroup) ? session.countGroup : instrumentGroupIds[0])
-          : '',
+        countGroups: account.role === 'contador'
+          ? normalizeCountGroups(session.countGroups || session.countGroup)
+          : [],
         loginAt: session.loginAt || new Date().toISOString(),
       };
     } catch (error) {
@@ -356,8 +372,8 @@
       return;
     }
 
-    document.getElementById('currentUserChip').textContent = currentUser.countGroup
-      ? `${currentUser.name} | ${currentUser.role} | ${groupLabel(currentUser.countGroup)}`
+    document.getElementById('currentUserChip').textContent = currentUser.countGroups?.length
+      ? `${currentUser.name} | ${currentUser.role} | ${groupLabels(currentUser.countGroups)}`
       : `${currentUser.name} | ${currentUser.role}`;
 
     document.querySelectorAll('.admin-only').forEach((element) => {
@@ -491,9 +507,9 @@
         username: updatedCurrentUser.username,
         name: updatedCurrentUser.name,
         role: updatedCurrentUser.role,
-        countGroup: updatedCurrentUser.role === 'contador'
-          ? (currentUser.countGroup || instrumentGroupIds[0])
-          : '',
+        countGroups: updatedCurrentUser.role === 'contador'
+          ? normalizeCountGroups(currentUser.countGroups || currentUser.countGroup)
+          : [],
         loginAt: currentUser.loginAt,
       };
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
@@ -789,7 +805,8 @@
     const availableGroups = activeCatalog();
     if (currentUser?.role !== 'contador') return availableGroups;
 
-    return availableGroups.filter((group) => group.id === currentUser.countGroup);
+    const allowedGroups = normalizeCountGroups(currentUser.countGroups || currentUser.countGroup);
+    return availableGroups.filter((group) => allowedGroups.includes(group.id));
   }
 
   function isInstructorMeetingType(eventType) {
@@ -805,6 +822,10 @@
 
   function groupLabel(groupId) {
     return catalog.find((group) => group.id === groupId)?.label || groupId;
+  }
+
+  function groupLabels(groupIds) {
+    return groupIds.map(groupLabel).join(', ');
   }
 
   function itemLabelForCurrentEvent(label) {
