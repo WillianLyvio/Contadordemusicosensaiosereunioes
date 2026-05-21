@@ -101,6 +101,19 @@ button {
   font-weight: 800;
 }
 
+.system-signature,
+.app-footer {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.app-footer {
+  padding: 16px 12px 22px;
+}
+
 .login-group-field {
   margin: 0;
   border: 1px solid var(--line);
