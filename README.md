@@ -64,6 +64,8 @@ Perfis administráveis:
 - `Administrador`: gerencia usuários, perfis e logs.
 - `Contador`: registra contagens, consolida arquivos e gera relatório.
 
+Ao entrar como `contador`, o usuário deve escolher o grupo instrumental que vai contar. Na aba `Contagem`, ele verá somente esse grupo. O administrador continua visualizando todos os grupos.
+
 Fluxo recomendado:
 
 1. Abra o sistema em todos os celulares.

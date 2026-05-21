@@ -8,6 +8,7 @@
 │ Acesso ao sistema            │
 │ Usuário                      │
 │ Senha                        │
+│ Grupo para contagem          │
 │ [Entrar]                     │
 └──────────────────────────────┘
 ```

@@ -59,6 +59,8 @@ Sem backend, esse controle não impede adulteração por alguém com acesso téc
 
 O administrador pode criar, editar, resetar senhas e excluir usuários pela aba `Admin`. O sistema preserva pelo menos um administrador para evitar bloqueio total do acesso.
 
+Usuários com perfil `contador` escolhem o grupo instrumental no login. Essa escolha fica na sessão local e limita a aba `Contagem` ao grupo selecionado.
+
 ## Contagem Por Tipo De Evento
 
 - `Ensaio Regional`: mostra todos os grupos de contagem do relatório.
