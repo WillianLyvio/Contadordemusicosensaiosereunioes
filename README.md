@@ -12,9 +12,9 @@ public/
   index.html                Entrada estática sem PHP
   manifest.webmanifest      Configuração PWA
   service-worker.js         Cache offline
+  data/users.json           Usuários consultados no login
   assets/
     css/app.css             Interface responsiva branco/cinza
-    js/users.js             Usuários salvos no código do app
     js/app.js               Contagem, armazenamento e relatório
     img/logo-ccb-light.svg  Logo correta usada no sistema
     img/logo-ccb.svg        Alias do mesmo arquivo para compatibilidade
@@ -26,22 +26,22 @@ O sistema usa `localStorage` no próprio navegador. Isso significa:
 
 - cada celular guarda sua contagem localmente;
 - não existe banco de dados remoto;
-- não existe login obrigatório;
+- o login é local e consulta um arquivo JSON do projeto;
 - não existe dependência de Firebase ou outro backend;
 - o relatório final é feito em um aparelho coordenador.
 
 ## Login e Perfis
 
-O controle de acesso carrega uma lista base definida no código em `public/assets/js/users.js`.
+O controle de acesso consulta o arquivo `public/data/users.json` sempre que alguém tenta fazer login.
 
-Usuários salvos no código:
+Usuários salvos no arquivo do projeto:
 
 ```text
 admin / admin123
 contador / contador123
 ```
 
-Para cadastrar usuários que já funcionem em qualquer aparelho, adicione novos objetos nesse arquivo e publique a atualização. Usuários criados pela tela `Admin` continuam salvos apenas no navegador local.
+Para cadastrar usuários que já funcionem em qualquer aparelho, adicione novos objetos em `public/data/users.json` e publique a atualização. Usuários criados pela tela `Admin` continuam salvos apenas no navegador local.
 
 Perfis:
 
@@ -52,7 +52,7 @@ Importante: como o sistema não usa servidor, esse login serve para controle ope
 
 ## Login Em Outro Aparelho
 
-Usuários cadastrados em `public/assets/js/users.js` já ficam disponíveis em qualquer aparelho que abrir a versão atualizada do sistema.
+Usuários cadastrados em `public/data/users.json` já ficam disponíveis em qualquer aparelho que abrir a versão atualizada do sistema.
 
 Como o sistema não usa servidor nem banco de dados central, os usuários criados pela tela `Admin` ficam salvos apenas no navegador daquele aparelho. Para levar esses usuários locais para outro celular:
 

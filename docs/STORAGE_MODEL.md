@@ -52,13 +52,13 @@ Estrutura:
 
 ## Usuários
 
-Os usuários base ficam no código em:
+Os usuários base ficam no arquivo:
 
 ```text
-public/assets/js/users.js
+public/data/users.json
 ```
 
-Esses usuários funcionam em qualquer aparelho que abrir a versão publicada. Usuários criados pela tela `Admin` continuam locais e ficam em:
+Esse arquivo é consultado em cada tentativa de login e seus usuários funcionam em qualquer aparelho que abrir a versão publicada. Usuários criados pela tela `Admin` continuam locais e ficam em:
 
 ```text
 contador-musicos-users-v1

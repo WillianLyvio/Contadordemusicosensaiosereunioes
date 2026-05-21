@@ -5,9 +5,8 @@
   const AUTH_SESSION_KEY = 'contador-musicos-auth-v1';
   const ACCESS_LOG_KEY = 'contador-musicos-access-logs-v1';
   const USER_STORAGE_KEY = 'contador-musicos-users-v1';
-  const CODE_USER_ACCOUNTS = Array.isArray(window.APP_USER_ACCOUNTS) && window.APP_USER_ACCOUNTS.length > 0
-    ? window.APP_USER_ACCOUNTS
-    : [
+  const USER_DATA_URL = 'data/users.json';
+  const FALLBACK_USER_ACCOUNTS = [
     {
       username: 'admin',
       password: 'admin123',
@@ -21,6 +20,7 @@
       role: 'contador',
     },
   ];
+  let projectUserAccounts = [];
 
   const catalog = [
     {
@@ -137,7 +137,9 @@
 
   document.addEventListener('DOMContentLoaded', init);
 
-  function init() {
+  async function init() {
+    await refreshProjectUserAccounts();
+    currentUser = loadSession();
     bindAuth();
     bindTabs();
     bindActions();
@@ -169,8 +171,10 @@
     document.getElementById('loginUser').addEventListener('change', renderLoginGroupRequirement);
     document.getElementById('loginImportUsers').addEventListener('change', importUsersFile);
 
-    document.getElementById('loginForm').addEventListener('submit', (event) => {
+    document.getElementById('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
+      await refreshProjectUserAccounts();
+      renderLoginGroupRequirement();
       const username = normalizeUsername(document.getElementById('loginUser').value);
       const password = document.getElementById('loginPassword').value;
       const account = readUserAccounts().find((user) => (
@@ -288,36 +292,76 @@
 
   function readUserAccounts() {
     try {
-      const stored = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '[]');
-      const storedUsers = Array.isArray(stored) ? stored : [];
-      const normalized = uniqueUsers([...storedUsers, ...codeUserAccounts()]);
+      const storedUsers = readStoredUserAccounts();
+      const normalized = uniqueUsers([...storedUsers, ...projectFileUserAccounts()]);
 
       if (!normalized.some((user) => user.role === 'administrador')) {
-        normalized.unshift(codeUserAccounts()[0]);
+        normalized.unshift(projectFileUserAccounts()[0]);
       }
 
       saveUserAccounts(normalized);
       return uniqueUsers(normalized);
     } catch (error) {
-      const fallback = codeUserAccounts();
+      const fallback = projectFileUserAccounts();
       saveUserAccounts(fallback);
       return fallback;
     }
   }
 
-  function codeUserAccounts() {
-    return uniqueUsers(CODE_USER_ACCOUNTS.filter((user) => (
+  function readStoredUserAccounts() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(USER_STORAGE_KEY) || '[]');
+      return normalizeUserList(stored);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async function refreshProjectUserAccounts() {
+    try {
+      const response = await fetch(USER_DATA_URL, {
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('users file not found');
+
+      const packet = await response.json();
+      const users = Array.isArray(packet) ? packet : packet.users;
+      const normalized = normalizeUserList(users);
+      if (!normalized.some((user) => user.role === 'administrador')) {
+        throw new Error('users file needs an administrator');
+      }
+
+      projectUserAccounts = normalized;
+      saveUserAccounts(readUserAccounts());
+    } catch (error) {
+      if (projectUserAccounts.length === 0) {
+        projectUserAccounts = normalizeUserList(FALLBACK_USER_ACCOUNTS);
+      }
+    }
+
+    return projectUserAccounts;
+  }
+
+  function projectFileUserAccounts() {
+    const source = projectUserAccounts.length > 0 ? projectUserAccounts : FALLBACK_USER_ACCOUNTS;
+    return normalizeUserList(source);
+  }
+
+  function normalizeUserList(users) {
+    return uniqueUsers((Array.isArray(users) ? users : []).filter((user) => (
       user?.username && user?.password && user?.role
     )));
   }
 
-  function isCodeUser(username) {
+  function isProjectFileUser(username) {
     const key = normalizeUsername(username);
-    return codeUserAccounts().some((user) => user.username === key);
+    return projectFileUserAccounts().some((user) => user.username === key);
   }
 
   function saveUserAccounts(users) {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(uniqueUsers(users)));
+    const localUsers = uniqueUsers(users)
+      .filter((user) => !isProjectFileUser(user.username));
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(localUsers));
   }
 
   function exportUsers() {
@@ -542,8 +586,8 @@
       return;
     }
 
-    if (isCodeUser(username) || isCodeUser(editKey)) {
-      showToast('Usuario salvo no codigo. Edite em assets/js/users.js.');
+    if (isProjectFileUser(username) || isProjectFileUser(editKey)) {
+      showToast('Usuario salvo no arquivo. Edite em data/users.json.');
       return;
     }
 
@@ -618,8 +662,8 @@
       return;
     }
 
-    if (isCodeUser(username)) {
-      showToast('Usuario salvo no codigo. Remova em assets/js/users.js.');
+    if (isProjectFileUser(username)) {
+      showToast('Usuario salvo no arquivo. Remova em data/users.json.');
       return;
     }
 
@@ -646,8 +690,8 @@
   function resetUserPassword(username) {
     if (!isAdmin()) return;
 
-    if (isCodeUser(username)) {
-      showToast('Usuario salvo no codigo. Edite em assets/js/users.js.');
+    if (isProjectFileUser(username)) {
+      showToast('Usuario salvo no arquivo. Edite em data/users.json.');
       return;
     }
 
@@ -1098,17 +1142,17 @@
 
     document.getElementById('userTableBody').innerHTML = users.map((user) => {
       const isCurrent = currentUser?.username === user.username;
-      const codeUser = isCodeUser(user.username);
+      const projectUser = isProjectFileUser(user.username);
       return `
         <tr>
           <td>${escapeHtml(user.name)}${isCurrent ? ' <strong>(logado)</strong>' : ''}</td>
           <td>${escapeHtml(user.username)}</td>
-          <td>${escapeHtml(roleLabel(user.role))}${codeUser ? ' <span class="source-tag">codigo</span>' : ''}</td>
+          <td>${escapeHtml(roleLabel(user.role))}${projectUser ? ' <span class="source-tag">arquivo</span>' : ''}</td>
           <td>
             <div class="table-actions">
-              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Editar</button>
-              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Resetar senha</button>
-              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}" ${codeUser ? 'disabled' : ''}>Excluir</button>
+              <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Editar</button>
+              <button class="table-action" type="button" data-user-action="reset-password" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Resetar senha</button>
+              <button class="table-action danger" type="button" data-user-action="delete" data-username="${escapeHtml(user.username)}" ${projectUser ? 'disabled' : ''}>Excluir</button>
             </div>
           </td>
         </tr>

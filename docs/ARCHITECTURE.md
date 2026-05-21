@@ -20,7 +20,7 @@ Navegador do celular
   │   ├─ Cálculo de totais
   │   ├─ localStorage
   │   ├─ Login local por usuário e senha
-  │   ├─ Usuários base em assets/js/users.js
+  │   ├─ Usuários base em data/users.json
   │   ├─ Administração local de usuários e perfis
   │   ├─ Logs locais de acesso
   │   ├─ Exportação JSON
@@ -54,11 +54,11 @@ Essa abordagem é simples, auditável e funciona mesmo sem internet.
 
 ## Controle De Acesso
 
-O login é local e carrega os usuários base definidos em `public/assets/js/users.js`. A sessão, os logs e os usuários criados no painel `Admin` ficam no `localStorage`.
+O login é local e consulta `public/data/users.json` antes de validar usuário e senha. A sessão, os logs e os usuários criados no painel `Admin` ficam no `localStorage`.
 
 Sem backend, esse controle não impede adulteração por alguém com acesso técnico ao navegador/código. Ele é adequado para organização de uso e auditoria local, não para segurança forte.
 
-O administrador pode criar, editar, resetar senhas e excluir usuários locais pela aba `Admin`. Usuários salvos no código aparecem marcados como `codigo` e devem ser alterados diretamente em `public/assets/js/users.js`.
+O administrador pode criar, editar, resetar senhas e excluir usuários locais pela aba `Admin`. Usuários salvos em `public/data/users.json` aparecem marcados como `arquivo` e devem ser alterados diretamente nesse JSON.
 
 Usuários com perfil `contador` escolhem um ou mais grupos instrumentais no login. Essa escolha fica na sessão local e limita a aba `Contagem` aos grupos selecionados.
 

@@ -8,7 +8,7 @@ Abra diretamente:
 public/index.html
 ```
 
-Essa opção funciona para a contagem e armazenamento local. Alguns recursos de PWA/cache offline podem ser bloqueados pelo navegador quando aberto via arquivo local.
+Essa opção funciona para a contagem e armazenamento local. Alguns recursos de PWA/cache offline e a leitura de `public/data/users.json` podem ser bloqueados pelo navegador quando aberto via arquivo local. Para testar login com o arquivo de usuários, prefira a opção de servidor local simples.
 
 ## Opção 2: Servidor Local Simples
 
@@ -41,8 +41,8 @@ Arquivos necessários:
 ```text
 public/index.html
 public/index.php
+public/data/users.json
 public/assets/css/app.css
-public/assets/js/users.js
 public/assets/js/app.js
 public/assets/img/logo-ccb-light.svg
 public/assets/img/logo-ccb.svg
@@ -61,7 +61,7 @@ public/service-worker.js
 
 ## Usuários Em Vários Celulares
 
-Os usuários cadastrados em `public/assets/js/users.js` ficam salvos no código e passam a funcionar em qualquer aparelho depois que a versão atualizada for publicada.
+Os usuários cadastrados em `public/data/users.json` ficam salvos no projeto e passam a funcionar em qualquer aparelho depois que a versão atualizada for publicada. O sistema consulta esse arquivo em cada tentativa de login.
 
 Sem servidor, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar esses usuários locais em outro celular:
 
