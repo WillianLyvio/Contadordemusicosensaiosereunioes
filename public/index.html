@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f5">
+  <title>Contador de Músicos</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <img src="assets/img/logo-ccb-light.svg?v=20260521-1520" alt="Congregação Cristã no Brasil" class="brand-logo">
+        <div>
+          <strong>Contador de Músicos</strong>
+          <span>Relatório de músicos consolidado</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-button" type="button" data-action="save" title="Salvar">
+          Salvar
+        </button>
+        <button class="icon-button primary" type="button" data-action="print" title="Imprimir relatório">
+          PDF
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Navegação principal">
+      <button class="tab is-active" type="button" data-tab="event">Evento</button>
+      <button class="tab" type="button" data-tab="count">Contagem</button>
+      <button class="tab" type="button" data-tab="sync">Consolidar</button>
+      <button class="tab" type="button" data-tab="report">Relatório</button>
+    </nav>
+
+    <main class="content">
+      <section class="view is-active" id="view-event">
+        <div class="section-heading">
+          <h1>Evento do dia</h1>
+          <p>Os dados ficam salvos neste aparelho. Para juntar vários celulares, exporte e importe as contagens na aba Consolidar.</p>
+        </div>
+
+        <div class="panel form-grid">
+          <label>
+            <span>Nome do evento</span>
+            <input id="eventName" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Data</span>
+            <input id="eventDate" type="date">
+          </label>
+          <label>
+            <span>Local</span>
+            <input id="eventLocal" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Região</span>
+            <input id="eventRegion" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Nome deste aparelho</span>
+            <input id="deviceName" type="text" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="info-grid">
+          <article class="panel info-card">
+            <strong>Armazenamento sem servidor</strong>
+            <p>O sistema usa o armazenamento local do navegador. Cada celular guarda sua própria contagem e exporta um arquivo JSON.</p>
+          </article>
+          <article class="panel info-card">
+            <strong>Relatório único do dia</strong>
+            <p>Um aparelho coordenador importa os arquivos dos demais celulares e gera um único relatório consolidado.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="view-count">
+        <div class="section-heading">
+          <h1>Contagem</h1>
+          <p>Use somente os botões para alterar as quantidades.</p>
+        </div>
+
+        <div class="group-strip" id="groupStrip"></div>
+        <div class="summary-strip" id="summaryStrip"></div>
+        <div class="counter-list" id="counterList"></div>
+      </section>
+
+      <section class="view" id="view-sync">
+        <div class="section-heading">
+          <h1>Consolidação</h1>
+          <p>Sem servidor: cada celular exporta sua contagem e o coordenador importa todos os arquivos no fim do dia.</p>
+        </div>
+
+        <div class="sync-layout">
+          <article class="panel">
+            <h2>Exportar deste aparelho</h2>
+            <p class="muted">Envie este arquivo por WhatsApp, cabo, Bluetooth, e-mail ou outro meio disponível.</p>
+            <button class="button primary block" type="button" data-action="export">Exportar contagem JSON</button>
+          </article>
+
+          <article class="panel">
+            <h2>Importar de outros celulares</h2>
+            <p class="muted">Selecione um ou vários arquivos JSON. Se o mesmo aparelho for importado de novo, a versão mais recente substitui a anterior.</p>
+            <label class="file-picker">
+              <input id="importFiles" type="file" accept="application/json,.json" multiple>
+              Importar arquivos
+            </label>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-title-row">
+            <h2>Celulares importados</h2>
+            <button class="button subtle" type="button" data-action="clear-imports">Limpar importações</button>
+          </div>
+          <div class="import-list" id="importList"></div>
+        </article>
+      </section>
+
+      <section class="view" id="view-report">
+        <div class="section-heading no-print">
+          <h1>Relatório final</h1>
+          <p>Este relatório soma a contagem deste aparelho com todas as importações aceitas para a mesma data.</p>
+        </div>
+
+        <div class="report-actions no-print">
+          <button class="button" type="button" data-action="export-final">Exportar relatório JSON</button>
+          <button class="button primary" type="button" data-action="print">Imprimir / Salvar PDF</button>
+        </div>
+
+        <article class="report-sheet" id="reportSheet">
+          <header class="report-header">
+            <img src="assets/img/logo-ccb-light.svg?v=20260521-1520" alt="Congregação Cristã no Brasil">
+            <div>
+              <h2>Relatório Estatístico de Músicos e Organistas</h2>
+              <p id="reportSubtitle"></p>
+            </div>
+          </header>
+
+          <div class="report-meta" id="reportMeta"></div>
+          <div class="totals-grid" id="totalsGrid"></div>
+
+          <section class="report-block">
+            <h3>Distribuição por grupo instrumental</h3>
+            <div class="chart-row">
+              <div class="pie-chart" id="pieChart"></div>
+              <div class="legend" id="chartLegend"></div>
+            </div>
+          </section>
+
+          <section class="table-grid" id="tableGrid"></section>
+
+          <footer class="report-footer">
+            <strong>Observações:</strong>
+            relatório consolidado localmente a partir das contagens do dia importadas dos aparelhos participantes.
+          </footer>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
