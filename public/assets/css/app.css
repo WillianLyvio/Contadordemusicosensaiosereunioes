@@ -88,6 +88,19 @@ button {
   font-weight: 800;
 }
 
+.login-import {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.login-import span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .login-group-field {
   margin: 0;
   border: 1px solid var(--line);

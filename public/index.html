@@ -37,6 +37,13 @@
       </fieldset>
       <button class="button primary block" type="submit">Entrar</button>
       <div class="login-error" id="loginError" role="alert"></div>
+      <div class="login-import">
+        <span>Entrando em outro aparelho?</span>
+        <label class="file-picker">
+          <input id="loginImportUsers" type="file" accept="application/json,.json">
+          Importar usuários
+        </label>
+      </div>
     </form>
   </section>
 
@@ -218,6 +225,11 @@
         </div>
 
         <div class="admin-actions">
+          <button class="button" type="button" data-action="export-users">Exportar usuários JSON</button>
+          <label class="file-picker admin-import-picker">
+            <input id="adminImportUsers" type="file" accept="application/json,.json">
+            Importar usuários JSON
+          </label>
           <button class="button" type="button" data-action="export-logs">Exportar logs JSON</button>
           <button class="button subtle" type="button" data-action="clear-logs">Limpar logs</button>
         </div>

@@ -165,6 +165,7 @@
   function bindAuth() {
     document.getElementById('loginUser').addEventListener('input', renderLoginGroupRequirement);
     document.getElementById('loginUser').addEventListener('change', renderLoginGroupRequirement);
+    document.getElementById('loginImportUsers').addEventListener('change', importUsersFile);
 
     document.getElementById('loginForm').addEventListener('submit', (event) => {
       event.preventDefault();
@@ -247,6 +248,7 @@
         if (action === 'export') exportDeviceCounts();
         if (action === 'export-final') exportFinalReport();
         if (action === 'logout') logout();
+        if (action === 'export-users') exportUsers();
         if (action === 'export-logs') exportAccessLogs();
         if (action === 'clear-logs') clearAccessLogs();
         if (action === 'clear-imports') {
@@ -269,6 +271,7 @@
     });
 
     document.getElementById('cancelUserEdit').addEventListener('click', resetUserForm);
+    document.getElementById('adminImportUsers').addEventListener('change', importUsersFile);
 
     document.getElementById('userTableBody').addEventListener('click', (event) => {
       const button = event.target.closest('[data-user-action]');
@@ -311,6 +314,59 @@
 
   function saveUserAccounts(users) {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(uniqueUsers(users)));
+  }
+
+  function exportUsers() {
+    if (!isAdmin()) {
+      showToast('Acesso permitido apenas para administrador.');
+      return;
+    }
+
+    writeAccessLog('export_users', 'Usuários exportados');
+    downloadJson(fileName('usuarios', 'acesso'), {
+      schemaVersion: 1,
+      kind: 'users',
+      exportedAt: new Date().toISOString(),
+      exportedBy: currentUser,
+      users: readUserAccounts(),
+    });
+  }
+
+  async function importUsersFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const packet = JSON.parse(await file.text());
+      const importedUsers = Array.isArray(packet) ? packet : packet.users;
+      if (!Array.isArray(importedUsers) || importedUsers.length === 0) {
+        showToast('Arquivo de usuários inválido.');
+        return;
+      }
+
+      const normalizedImportedUsers = uniqueUsers(
+        importedUsers.filter((user) => user?.username && user?.password && user?.role),
+      );
+
+      if (!normalizedImportedUsers.some((user) => user.role === 'administrador')) {
+        showToast('O arquivo precisa conter pelo menos um administrador.');
+        return;
+      }
+
+      const mergedUsers = uniqueUsers([
+        ...readUserAccounts(),
+        ...normalizedImportedUsers,
+      ]);
+      saveUserAccounts(mergedUsers);
+      writeAccessLog('import_users', `${normalizedImportedUsers.length} usuário(s) importado(s)`);
+      renderLoginGroupRequirement();
+      if (currentUser) render();
+      showToast(`${normalizedImportedUsers.length} usuário(s) importado(s).`);
+    } catch (error) {
+      showToast('Não foi possível importar usuários.');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function uniqueUsers(users) {
@@ -1054,7 +1110,9 @@
       export_counts: 'Exportou contagem',
       export_final_report: 'Exportou relatório final',
       export_logs: 'Exportou logs',
+      export_users: 'Exportou usuários',
       import_counts: 'Importou contagens',
+      import_users: 'Importou usuários',
       login_failed: 'Falha de login',
       login_success: 'Login',
       logout: 'Logout',

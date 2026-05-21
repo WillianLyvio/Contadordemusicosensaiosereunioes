@@ -30,6 +30,8 @@ Com PHP:
 php -S 127.0.0.1:8790 -t public
 ```
 
+Observação: `127.0.0.1` abre apenas no próprio computador. Para testar em um celular na mesma rede, use o IP do computador no Wi-Fi, por exemplo `http://192.168.0.10:8790`.
+
 ## Opção 3: Hospedagem Estática
 
 Pode hospedar a pasta `public/` em qualquer hospedagem simples, inclusive sem banco de dados.
@@ -55,6 +57,18 @@ public/service-worker.js
 4. Cada celular exporta seu JSON.
 5. O coordenador importa os arquivos.
 6. O coordenador gera o PDF pelo navegador.
+
+## Usuários Em Vários Celulares
+
+Sem servidor, os usuários criados no `Admin` ficam salvos somente no navegador do aparelho onde foram criados. Para liberar acesso em outro celular:
+
+1. No aparelho principal, entre como administrador.
+2. Acesse `Admin` e clique em `Exportar usuários JSON`.
+3. Envie o arquivo para o outro celular.
+4. No outro celular, na tela de login, toque em `Importar usuários`.
+5. Depois da importação, use o mesmo usuário e senha.
+
+O JSON exportado contém as senhas cadastradas. Trate esse arquivo como confidencial.
 
 ## Backup
 

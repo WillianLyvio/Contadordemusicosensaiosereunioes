@@ -47,6 +47,19 @@ Perfis:
 
 Importante: como o sistema não usa servidor, esse login serve para controle operacional no aparelho. Para segurança forte seria necessário backend.
 
+## Login Em Outro Aparelho
+
+Como o sistema não usa servidor nem banco de dados central, os usuários criados pelo administrador ficam salvos apenas no navegador daquele aparelho. Para usar os mesmos logins em outro celular:
+
+1. Entre como `admin` no aparelho principal.
+2. Acesse `Admin`.
+3. Clique em `Exportar usuários JSON`.
+4. Envie o arquivo JSON para o outro celular.
+5. Na tela de login do outro celular, toque em `Importar usuários`.
+6. Selecione o JSON e faça login com o usuário criado.
+
+Esse arquivo contém usuários, perfis e senhas em texto legível dentro do JSON. Guarde e compartilhe apenas com pessoas autorizadas.
+
 ## Logs de Acesso
 
 Os logs são salvos no `localStorage` do navegador em que o sistema está sendo usado. A página `Admin` permite:
