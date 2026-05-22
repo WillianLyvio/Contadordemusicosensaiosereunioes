@@ -8,6 +8,12 @@
       "role": "administrador"
     },
     {
+      "username": "Erick Godoy",
+      "password": "erickgodoy",
+      "name": "Contador",
+      "role": "contador"
+    },
+    {
       "username": "contador",
       "password": "contador123",
       "name": "Contador",
