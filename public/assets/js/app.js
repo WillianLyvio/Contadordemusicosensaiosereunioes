@@ -295,18 +295,15 @@
   function readUserAccounts() {
     try {
       const storedUsers = readStoredUserAccounts();
-      const normalized = uniqueUsers([...storedUsers, ...projectFileUserAccounts()]);
+      const normalized = uniqueUsers([...projectFileUserAccounts(), ...storedUsers]);
 
       if (!normalized.some((user) => user.role === 'administrador')) {
         normalized.unshift(projectFileUserAccounts()[0]);
       }
 
-      saveUserAccounts(normalized);
       return uniqueUsers(normalized);
     } catch (error) {
-      const fallback = projectFileUserAccounts();
-      saveUserAccounts(fallback);
-      return fallback;
+      return projectFileUserAccounts();
     }
   }
 
@@ -334,7 +331,6 @@
       }
 
       projectUserAccounts = normalized;
-      saveUserAccounts(readUserAccounts());
     } catch (error) {
       if (projectUserAccounts.length === 0) {
         projectUserAccounts = normalizeUserList(FALLBACK_USER_ACCOUNTS);
@@ -360,9 +356,15 @@
     return projectFileUserAccounts().some((user) => user.username === key);
   }
 
-  function saveUserAccounts(users) {
+  function isStoredUser(username) {
+    const key = normalizeUsername(username);
+    return readStoredUserAccounts().some((user) => user.username === key);
+  }
+
+  function saveUserAccounts(users, options = {}) {
+    const includeProjectUsers = options.includeProjectUsers === true;
     const localUsers = uniqueUsers(users)
-      .filter((user) => !isProjectFileUser(user.username));
+      .filter((user) => includeProjectUsers || !isProjectFileUser(user.username));
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(localUsers));
   }
 
@@ -456,7 +458,7 @@
         }
       }
 
-      saveUserAccounts(mergedUsers);
+      saveUserAccounts(mergedUsers, {includeProjectUsers: !savedGlobally});
       writeAccessLog('import_users', `${normalizedImportedUsers.length} usuário(s) importado(s)`);
       renderLoginGroupRequirement();
       if (currentUser) render();
@@ -667,18 +669,21 @@
     }
 
     let savedGlobally = false;
+    let syncError = null;
     try {
       savedGlobally = await syncUsersFile(nextUsers);
     } catch (error) {
-      showToast(error.message);
+      syncError = error;
     }
 
-    if (!savedGlobally && (isProjectFileUser(username) || isProjectFileUser(editKey))) {
-      showToast('Nao foi possivel atualizar o usuario no arquivo.');
+    if (!savedGlobally && editKey && username !== editKey && isProjectFileUser(editKey)) {
+      showToast('Nao foi possivel renomear o usuario no arquivo.');
       return;
     }
 
-    saveUserAccounts(nextUsers);
+    saveUserAccounts(nextUsers, {
+      includeProjectUsers: !savedGlobally && (isProjectFileUser(username) || isProjectFileUser(editKey)),
+    });
 
     if (currentUser?.username === editKey || currentUser?.username === username) {
       const updatedCurrentUser = readUserAccounts().find((user) => user.username === username);
@@ -697,9 +702,19 @@
     writeAccessLog(existing ? 'update_user' : 'create_user', username);
     resetUserForm();
     render();
-    showToast(savedGlobally
-      ? (existing ? 'Usuario atualizado no arquivo.' : 'Usuario criado no arquivo.')
-      : (existing ? 'Usuario atualizado neste aparelho.' : 'Usuario criado neste aparelho.'));
+    if (savedGlobally) {
+      showToast(existing ? 'Usuario atualizado no arquivo.' : 'Usuario criado no arquivo.');
+      return;
+    }
+
+    if (syncError) {
+      showToast(existing
+        ? 'Nao foi possivel atualizar o arquivo; usuario atualizado neste aparelho.'
+        : 'Nao foi possivel atualizar o arquivo; usuario criado neste aparelho.');
+      return;
+    }
+
+    showToast(existing ? 'Usuario atualizado neste aparelho.' : 'Usuario criado neste aparelho.');
   }
 
   function editUser(username) {
@@ -779,21 +794,24 @@
         : item
     ));
     let savedGlobally = false;
+    let syncError = null;
     try {
       savedGlobally = await syncUsersFile(updatedUsers);
     } catch (error) {
-      showToast(error.message);
+      syncError = error;
     }
 
-    if (!savedGlobally && projectUser) {
-      showToast('Nao foi possivel redefinir a senha no arquivo.');
+    saveUserAccounts(updatedUsers, {includeProjectUsers: !savedGlobally && projectUser});
+    writeAccessLog('reset_password', username);
+    render();
+    if (savedGlobally) {
+      showToast('Senha redefinida no arquivo.');
       return;
     }
 
-    saveUserAccounts(updatedUsers);
-    writeAccessLog('reset_password', username);
-    render();
-    showToast(savedGlobally ? 'Senha redefinida no arquivo.' : 'Senha redefinida neste aparelho.');
+    showToast(syncError
+      ? 'Nao foi possivel atualizar o arquivo; senha redefinida neste aparelho.'
+      : 'Senha redefinida neste aparelho.');
   }
 
   function resetUserForm() {
@@ -1221,11 +1239,15 @@
     document.getElementById('userTableBody').innerHTML = users.map((user) => {
       const isCurrent = currentUser?.username === user.username;
       const projectUser = isProjectFileUser(user.username);
+      const storedUser = isStoredUser(user.username);
+      const sourceTag = storedUser
+        ? ' <span class="source-tag">local</span>'
+        : (projectUser ? ' <span class="source-tag">arquivo</span>' : '');
       return `
         <tr>
           <td>${escapeHtml(user.name)}${isCurrent ? ' <strong>(logado)</strong>' : ''}</td>
           <td>${escapeHtml(user.username)}</td>
-          <td>${escapeHtml(roleLabel(user.role))}${projectUser ? ' <span class="source-tag">arquivo</span>' : ''}</td>
+          <td>${escapeHtml(roleLabel(user.role))}${sourceTag}</td>
           <td>
             <div class="table-actions">
               <button class="table-action" type="button" data-user-action="edit" data-username="${escapeHtml(user.username)}">Editar</button>
