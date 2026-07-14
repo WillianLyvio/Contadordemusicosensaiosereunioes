@@ -15,9 +15,15 @@ try {
         [$event['date'] ?? '', $event['type'] ?? '', $event['name'] ?? '', $event['local'] ?? '']
     )));
     $db = database();
+    ensureEventFinalizationSchema($db);
     $db->exec('DELETE FROM group_assignments WHERE expires_at <= NOW()');
     if (($body['action'] ?? '') === 'reserve') {
         $user = currentUser();
+        $eventStatus = $db->prepare('SELECT status FROM events WHERE event_key=?');
+        $eventStatus->execute([$key]);
+        if ($eventStatus->fetchColumn() === 'finalizado') {
+            jsonResponse(['ok'=>false,'message'=>'Este evento foi finalizado. A contagem não pode ser iniciada.'],409);
+        }
         $deviceId = trim((string)($body['deviceId'] ?? ''));
         if ($groups === [] || $deviceId === '') jsonResponse(['ok'=>false,'message'=>'Selecione ao menos um grupo.'], 400);
         $placeholders = implode(',', array_fill(0, count($groups), '?'));

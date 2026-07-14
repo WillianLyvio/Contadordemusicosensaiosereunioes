@@ -165,6 +165,9 @@
       if (state.selectedEventKey) await loadRemoteCounts(false);
     }
     registerServiceWorker();
+    window.setInterval(() => {
+      if (currentUser && state.selectedEventKey) loadRemoteCounts(true);
+    }, 10000);
   }
 
   function bindTabs() {
@@ -183,6 +186,10 @@
           showToast('Selecione um evento antes de iniciar a contagem.');
           state.activeTab = 'select-event';
           render();
+          return;
+        }
+        if (button.dataset.tab === 'report' && !isEventFinalized()) {
+          showToast('O relatório será liberado após o Administrador encerrar a contagem.');
           return;
         }
         state.activeTab = button.dataset.tab;
@@ -245,7 +252,11 @@
           showToast('Dados salvos neste aparelho.');
         }
         if (action === 'print') {
-          await synchronizeCounts(false);
+          if (!isEventFinalized()) {
+            showToast('O relatório será liberado após o encerramento da contagem.');
+            return;
+          }
+          await loadRemoteCounts(false);
           state.activeTab = 'report';
           saveState();
           writeAccessLog('print_report', 'Relatório enviado para impressão/PDF');
@@ -253,6 +264,7 @@
           window.setTimeout(() => window.print(), 80);
         }
         if (action === 'sync-now') synchronizeCounts(true);
+        if (action === 'finalize-event') finalizeEvent();
         if (action === 'logout') logout();
         if (action === 'export-logs') exportAccessLogs();
         if (action === 'clear-logs') clearAccessLogs();
@@ -579,6 +591,10 @@
       error.textContent = 'Selecione o evento, ao menos um grupo e informe o nome do aparelho.';
       return;
     }
+    if (event.status === 'finalizado') {
+      error.textContent = 'Este evento já foi finalizado. Consulte o relatório pelo Histórico.';
+      return;
+    }
     try {
       await apiRequest(ASSIGNMENTS_API_URL, {method:'POST',body:JSON.stringify({
         action:'reserve',event,countGroups:groups,deviceId:state.deviceId,deviceName,
@@ -641,7 +657,9 @@
         <tr><td>${escapeHtml(formatDate(event.date))}</td><td>${escapeHtml(event.name)}</td>
         <td>${escapeHtml(event.type)}</td><td>${escapeHtml(event.local || '-')}</td>
         <td>${escapeHtml(event.createdBy || '-')}</td><td>${safeNumber(event.deviceCount)}</td>
-        <td><button class="table-action" type="button" data-history-event="${escapeHtml(event.eventKey)}">Visualizar / PDF</button></td></tr>
+        <td>${event.status === 'finalizado'
+          ? `<button class="table-action" type="button" data-history-event="${escapeHtml(event.eventKey)}">Visualizar / PDF</button>`
+          : '<button class="table-action" type="button" disabled>Aguardando finalização</button>'}</td></tr>
       `).join('') : '<tr><td colspan="7">Nenhum evento encontrado.</td></tr>';
     } catch (error) {
       document.getElementById('eventHistoryBody').innerHTML = `<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
@@ -650,7 +668,10 @@
 
   async function viewHistoricalReport(eventKey) {
     const event = historyEvents.find((item) => item.eventKey === eventKey);
-    if (!event) return;
+    if (!event || event.status !== 'finalizado') {
+      showToast('O relatório só fica disponível após a finalização do evento.');
+      return;
+    }
     const query = new URLSearchParams({date:event.date,type:event.type,name:event.name,local:event.local || ''});
     try {
       const packet = await apiRequest(`${SYNC_API_URL}?${query}`);
@@ -1116,6 +1137,8 @@
         regionalLeader: '',
         elder: '',
         region: '',
+        status: 'em_andamento',
+        finalizedAt: null,
       },
       counts: emptyCounts(),
       imports: {},
@@ -1179,7 +1202,7 @@
   }
 
   async function synchronizeCounts(showResult = false) {
-    if (!currentUser || !state.selectedEventKey || !currentUser.countGroups?.length || syncInProgress || !state.event.date || !state.event.type) return;
+    if (!currentUser || !state.selectedEventKey || !currentUser.countGroups?.length || syncInProgress || !state.event.date || !state.event.type || isEventFinalized()) return false;
     syncInProgress = true;
     try {
       await apiRequest(SYNC_API_URL, {
@@ -1196,8 +1219,14 @@
       await loadRemoteCounts(false);
       writeAccessLog('sync_counts', 'Contagem sincronizada com o Neon');
       if (showResult) showToast('Contagem sincronizada e relatório consolidado atualizado.');
+      return true;
     } catch (error) {
+      if (error.message.includes('finalizado')) {
+        state.event.status = 'finalizado';
+        render();
+      }
       if (showResult) showToast(`${error.message} Os dados continuam salvos neste aparelho.`);
+      return false;
     } finally {
       syncInProgress = false;
     }
@@ -1213,6 +1242,8 @@
     });
     try {
       const packet = await apiRequest(`${SYNC_API_URL}?${query}`);
+      state.event.status = packet.status || 'em_andamento';
+      state.event.finalizedAt = packet.finalizedAt || null;
       state.imports = {};
       (packet.devices || []).forEach((device) => {
         if (device.deviceId === state.deviceId) return;
@@ -1243,6 +1274,7 @@
     ensureSelectedGroup();
     renderGroups();
     renderCounters();
+    renderEventStatus();
     renderSummary();
     renderImports();
     renderReport();
@@ -1251,6 +1283,10 @@
   }
 
   function renderTabs() {
+    if (state.activeTab === 'report' && !isEventFinalized()) {
+      state.activeTab = state.selectedEventKey ? 'count' : 'select-event';
+      saveState();
+    }
     if (!isAdmin() && state.activeTab === 'admin') {
       state.activeTab = 'select-event';
       saveState();
@@ -1386,9 +1422,9 @@
       return `
         <div class="counter-row">
           <div class="counter-label">${escapeHtml(itemLabelForCurrentEvent(label, group.id))}</div>
-          <button class="counter-button" type="button" data-delta="-1" data-group="${group.id}" data-item="${itemId}">-</button>
+          <button class="counter-button" type="button" data-delta="-1" data-group="${group.id}" data-item="${itemId}" ${isEventFinalized() ? 'disabled' : ''}>-</button>
           <div class="counter-value">${value}</div>
-          <button class="counter-button plus" type="button" data-delta="1" data-group="${group.id}" data-item="${itemId}">+</button>
+          <button class="counter-button plus" type="button" data-delta="1" data-group="${group.id}" data-item="${itemId}" ${isEventFinalized() ? 'disabled' : ''}>+</button>
         </div>
       `;
     }).join('');
@@ -1406,6 +1442,56 @@
         render();
       });
     });
+  }
+
+  function isEventFinalized() {
+    return state.event?.status === 'finalizado';
+  }
+
+  function renderEventStatus() {
+    const finalized = isEventFinalized();
+    const countStatus = document.getElementById('countEventStatus');
+    const reportStatus = document.getElementById('reportEventStatus');
+    const finalizeButton = document.getElementById('finalizeEventButton');
+    const reportTab = document.querySelector('[data-tab="report"]');
+    const syncButton = document.querySelector('[data-action="sync-now"]');
+    countStatus.classList.toggle('is-hidden', !finalized);
+    countStatus.classList.toggle('is-finalized', finalized);
+    countStatus.textContent = finalized
+      ? 'Evento finalizado pelo Administrador. A contagem está bloqueada.'
+      : '';
+    reportStatus.classList.toggle('is-hidden', !state.selectedEventKey);
+    reportStatus.classList.toggle('is-finalized', finalized);
+    reportStatus.textContent = finalized
+      ? 'Contagem finalizada. O relatório consolidado está liberado.'
+      : 'Relatório indisponível enquanto a contagem estiver em andamento.';
+    finalizeButton.disabled = finalized || !state.selectedEventKey;
+    finalizeButton.textContent = finalized ? 'Contagem encerrada' : 'Encerrar contagem do evento';
+    reportTab.disabled = !finalized;
+    syncButton.disabled = finalized;
+  }
+
+  async function finalizeEvent() {
+    if (!isAdmin() || !state.selectedEventKey || isEventFinalized()) return;
+    if (!window.confirm('Encerrar a contagem deste evento? Após a finalização, nenhum contador poderá alterar os números.')) return;
+    const synchronized = await synchronizeCounts(true);
+    if (!synchronized) {
+      showToast('Não foi possível sincronizar a última contagem. O evento não foi encerrado.');
+      return;
+    }
+    try {
+      const packet = await apiRequest(EVENTS_API_URL, {method:'POST', body:JSON.stringify({
+        action:'finalize', eventKey:state.selectedEventKey,
+      })});
+      state.event.status = packet.status;
+      state.event.finalizedAt = packet.finalizedAt || new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      await loadRemoteCounts(false);
+      render();
+      showToast('Contagem encerrada. O relatório final foi liberado.');
+    } catch (error) {
+      showToast(error.message);
+    }
   }
 
   function renderSummary() {

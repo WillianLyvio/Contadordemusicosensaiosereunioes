@@ -6,14 +6,17 @@ require_once __DIR__ . DIRECTORY_SEPARATOR . 'bootstrap.php';
 try {
     $user = currentUser();
     $db = database();
+    ensureEventFinalizationSchema($db);
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $date = trim((string) ($_GET['date'] ?? ''));
         $sql = "SELECT e.id, e.event_key AS \"eventKey\", e.name, e.event_type AS type,
                        e.event_date::text AS date, e.location AS local,
                        e.regional_leader AS \"regionalLeader\", e.elder, e.region,
                        e.created_at AS \"createdAt\", u.name AS \"createdBy\",
+                       e.status, e.finalized_at AS \"finalizedAt\", fu.name AS \"finalizedBy\",
                        COUNT(dc.id)::int AS \"deviceCount\"
                 FROM events e LEFT JOIN users u ON u.id=e.created_by
+                LEFT JOIN users fu ON fu.id=e.finalized_by
                 LEFT JOIN device_counts dc ON dc.event_id=e.id";
         $params = [];
         if ($date !== '') {
@@ -23,7 +26,7 @@ try {
             $sql .= ' WHERE e.event_date >= CURRENT_DATE';
         }
         $direction = (($_GET['upcoming'] ?? '') === '1') ? 'ASC' : 'DESC';
-        $sql .= " GROUP BY e.id,u.name ORDER BY e.event_date $direction,e.created_at DESC";
+        $sql .= " GROUP BY e.id,u.name,fu.name ORDER BY e.event_date $direction,e.created_at DESC";
         $statement = $db->prepare($sql);
         $statement->execute($params);
         jsonResponse(['ok' => true, 'events' => $statement->fetchAll()]);
@@ -33,6 +36,21 @@ try {
         jsonResponse(['ok' => false, 'message' => 'Somente Administrador ou Supervisor pode criar eventos.'], 403);
     }
     $body = jsonBody();
+    if (($body['action'] ?? '') === 'finalize') {
+        if (($user['role'] ?? '') !== 'administrador') {
+            jsonResponse(['ok' => false, 'message' => 'Somente o Administrador pode encerrar a contagem.'], 403);
+        }
+        $eventKey = trim((string) ($body['eventKey'] ?? ''));
+        $statement = $db->prepare(
+            "UPDATE events SET status='finalizado',finalized_at=NOW(),finalized_by=:user_id,updated_at=NOW()
+             WHERE event_key=:event_key AND status='em_andamento' RETURNING finalized_at"
+        );
+        $statement->execute(['user_id' => $user['id'], 'event_key' => $eventKey]);
+        $finalizedAt = $statement->fetchColumn();
+        if ($finalizedAt === false) jsonResponse(['ok' => false, 'message' => 'Evento não encontrado ou já finalizado.'], 409);
+        $db->prepare('DELETE FROM group_assignments WHERE event_key=:event_key')->execute(['event_key' => $eventKey]);
+        jsonResponse(['ok' => true, 'status' => 'finalizado', 'finalizedAt' => $finalizedAt]);
+    }
     $event = is_array($body['event'] ?? null) ? $body['event'] : [];
     $originalEventKey = trim((string) ($body['originalEventKey'] ?? ''));
     $types = ['Reunião de encarregados e instrutores', 'Ensaio Regional', 'Exames musicais'];
@@ -49,10 +67,11 @@ try {
             jsonResponse(['ok' => false, 'message' => 'Já existe outro evento com esses mesmos dados.'], 409);
         }
         $statement = $db->prepare(
-            'UPDATE events SET event_key=:key,name=:name,event_type=:type,event_date=:date,location=:local,
+            "UPDATE events SET event_key=:key,name=:name,event_type=:type,event_date=:date,location=:local,
                regional_leader=:leader,elder=:elder,region=:region,updated_at=NOW()
-             WHERE event_key=:original AND event_date >= CURRENT_DATE AND CAST(:new_date_check AS date) >= CURRENT_DATE
-             RETURNING id'
+             WHERE event_key=:original AND event_date >= CURRENT_DATE AND status='em_andamento'
+               AND CAST(:new_date_check AS date) >= CURRENT_DATE
+             RETURNING id"
         );
         $statement->execute([
             'key'=>$key, 'name'=>trim((string)$event['name']), 'type'=>$event['type'], 'date'=>$event['date'],

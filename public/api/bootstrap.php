@@ -66,3 +66,13 @@ function apiFailure(Throwable $error): never
     error_log($error->__toString());
     jsonResponse(['ok' => false, 'message' => 'Não foi possível acessar o banco de dados.'], 503);
 }
+
+function ensureEventFinalizationSchema(PDO $database): void
+{
+    static $ready = false;
+    if ($ready) return;
+    $database->exec("ALTER TABLE events ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'em_andamento'");
+    $database->exec('ALTER TABLE events ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMPTZ');
+    $database->exec('ALTER TABLE events ADD COLUMN IF NOT EXISTS finalized_by BIGINT REFERENCES users(id)');
+    $ready = true;
+}

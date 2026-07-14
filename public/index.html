@@ -197,6 +197,8 @@
           <p>Use somente os botões para alterar as quantidades.</p>
         </div>
 
+        <div class="event-status-banner is-hidden" id="countEventStatus" role="status"></div>
+
         <div class="group-strip" id="groupStrip"></div>
         <div class="summary-strip" id="summaryStrip"></div>
         <div class="counter-list" id="counterList"></div>
@@ -212,6 +214,7 @@
           <h2>Sincronização do evento</h2>
           <p class="muted">O mesmo aparelho atualiza seu próprio registro, evitando contagens duplicadas.</p>
           <button class="button primary" type="button" data-action="sync-now">Sincronizar agora</button>
+          <button class="button admin-only" type="button" data-action="finalize-event" id="finalizeEventButton">Encerrar contagem do evento</button>
         </article>
 
         <article class="panel">
@@ -227,6 +230,8 @@
           <h1>Relatório final</h1>
           <p>Este relatório soma as contagens sincronizadas no Neon para o mesmo evento.</p>
         </div>
+
+        <div class="event-status-banner is-hidden no-print" id="reportEventStatus" role="status"></div>
 
         <div class="report-actions no-print">
           <button class="button primary" type="button" data-action="print">Imprimir / Salvar PDF</button>

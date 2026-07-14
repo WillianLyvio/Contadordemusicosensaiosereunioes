@@ -466,6 +466,21 @@ button:disabled,
   display: none !important;
 }
 
+.event-status-banner {
+  border: 1px solid #9a6b16;
+  border-radius: var(--radius-sm);
+  background: #fff7df;
+  color: #65450d;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+.event-status-banner.is-finalized {
+  border-color: #39704c;
+  background: #edf8f0;
+  color: #245336;
+}
+
 .section-heading {
   margin-bottom: 0;
 }

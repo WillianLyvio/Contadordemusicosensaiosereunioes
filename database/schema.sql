@@ -21,10 +21,17 @@ CREATE TABLE IF NOT EXISTS events (
     regional_leader VARCHAR(160) NOT NULL DEFAULT '',
     elder VARCHAR(160) NOT NULL DEFAULT '',
     region VARCHAR(120) NOT NULL DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'em_andamento' CHECK (status IN ('em_andamento', 'finalizado')),
+    finalized_at TIMESTAMPTZ,
+    finalized_by BIGINT REFERENCES users(id),
     created_by BIGINT REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE events ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'em_andamento';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS finalized_by BIGINT REFERENCES users(id);
 
 CREATE TABLE IF NOT EXISTS device_counts (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

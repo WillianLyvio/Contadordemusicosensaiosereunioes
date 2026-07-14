@@ -6,6 +6,7 @@ require_once __DIR__ . DIRECTORY_SEPARATOR . 'bootstrap.php';
 try {
     $user = currentUser();
     $db = database();
+    ensureEventFinalizationSchema($db);
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body = jsonBody();
@@ -28,7 +29,7 @@ try {
                name = EXCLUDED.name, location = EXCLUDED.location,
                regional_leader = EXCLUDED.regional_leader, elder = EXCLUDED.elder,
                region = EXCLUDED.region, updated_at = NOW()
-             RETURNING id'
+             RETURNING id,status'
         );
         $eventStatement->execute([
             'event_key' => $eventKey,
@@ -41,7 +42,12 @@ try {
             'region' => trim((string) ($event['region'] ?? '')),
             'created_by' => $user['id'],
         ]);
-        $eventId = (int) $eventStatement->fetchColumn();
+        $storedEvent = $eventStatement->fetch();
+        $eventId = (int) $storedEvent['id'];
+        if (($storedEvent['status'] ?? '') === 'finalizado') {
+            $db->rollBack();
+            jsonResponse(['ok' => false, 'message' => 'Este evento foi finalizado. A contagem está bloqueada.', 'status' => 'finalizado'], 409);
+        }
 
         $countStatement = $db->prepare(
             'INSERT INTO device_counts
@@ -79,6 +85,9 @@ try {
         'local' => (string) ($_GET['local'] ?? ''),
     ];
     $eventKey = eventKey($event);
+    $eventStatement = $db->prepare('SELECT status,finalized_at FROM events WHERE event_key=:event_key');
+    $eventStatement->execute(['event_key' => $eventKey]);
+    $storedEvent = $eventStatement->fetch() ?: ['status' => 'em_andamento', 'finalized_at' => null];
     $statement = $db->prepare(
         'SELECT dc.device_id, dc.device_name, dc.counts, dc.client_updated_at,
                 u.username, u.name AS user_name
@@ -99,7 +108,8 @@ try {
             'userName' => $row['user_name'],
         ];
     }, $statement->fetchAll());
-    jsonResponse(['ok' => true, 'eventKey' => $eventKey, 'devices' => $devices]);
+    jsonResponse(['ok' => true, 'eventKey' => $eventKey, 'devices' => $devices,
+        'status' => $storedEvent['status'], 'finalizedAt' => $storedEvent['finalized_at']]);
 } catch (Throwable $error) {
     if (isset($db) && $db instanceof PDO && $db->inTransaction()) {
         $db->rollBack();
