@@ -24,13 +24,13 @@ Não é mais necessário exportar ou importar arquivos JSON para consolidar a co
 
 ## Configuração do Neon
 
-No desenvolvimento local, copie `.env.example` para `.env` e informe a cadeia completa de conexão:
+No desenvolvimento local, use `neonctl link` para gerar `.env.local` automaticamente ou copie `.env.example` para `.env` e informe a cadeia completa de conexão:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@endpoint/neondb?sslmode=require"
 ```
 
-O `.env` está ignorado pelo Git. Em produção, configure `DATABASE_URL` diretamente no painel da hospedagem.
+Os arquivos `.env`, `.env.local` e `.neon` estão ignorados pelo Git. Em produção, configure `DATABASE_URL` diretamente no painel da hospedagem.
 
 Crie as tabelas e importe os usuários válidos de `public/data/users.json` na primeira execução:
 

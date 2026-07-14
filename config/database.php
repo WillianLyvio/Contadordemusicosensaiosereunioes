@@ -15,7 +15,9 @@ function database(): PDO
         return $connection;
     }
 
-    loadLocalEnvironment(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
+    $root = dirname(__DIR__);
+    loadLocalEnvironment($root . DIRECTORY_SEPARATOR . '.env.local');
+    loadLocalEnvironment($root . DIRECTORY_SEPARATOR . '.env');
     $databaseUrl = getenv('DATABASE_URL') ?: '';
 
     if ($databaseUrl === '') {
