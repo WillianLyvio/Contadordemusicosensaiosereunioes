@@ -39,7 +39,7 @@ export default async function handler(request, response) {
       send(response, 400, {ok: false, message: 'Selecione ao menos um grupo para contagem.'});
       return;
     }
-    if (user.role === 'contador') {
+    if (groups.length && deviceId) {
       const sql = database();
       const key = eventKey(input.event || {});
       await sql`DELETE FROM group_assignments WHERE expires_at <= NOW()`;

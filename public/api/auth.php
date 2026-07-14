@@ -46,7 +46,7 @@ try {
     if ($user['role'] === 'contador' && ($groups === [] || $deviceId === '')) {
         jsonResponse(['ok' => false, 'message' => 'Selecione ao menos um grupo para contagem.'], 400);
     }
-    if ($user['role'] === 'contador') {
+    if ($groups !== [] && $deviceId !== '') {
         reserveGroups(database(), $user, $event, $groups, $deviceId, trim((string) ($body['deviceName'] ?? '')));
     }
 

@@ -205,7 +205,7 @@
         return;
       }
 
-      const countGroups = response.user.role === 'contador' ? requestedGroups : [];
+      const countGroups = requestedGroups;
       if (response.user.role === 'contador' && countGroups.length === 0) {
         await apiRequest(AUTH_API_URL, {method: 'DELETE'}).catch(() => null);
         document.getElementById('loginError').textContent = 'Selecione ao menos um grupo para contagem.';
@@ -237,6 +237,7 @@
 
   function renderLoginGroupRequirement() {
     document.getElementById('loginGroupField').classList.remove('is-hidden');
+    checkSelectedGroupAvailability();
   }
 
   function bindActions() {
@@ -490,7 +491,7 @@
         username: session.username,
         name: session.name,
         role: session.role,
-        countGroups: session.role === 'contador'
+        countGroups: (session.countGroups || session.countGroup)
           ? normalizeCountGroups(session.countGroups || session.countGroup)
           : [],
         loginAt: session.loginAt || new Date().toISOString(),
@@ -511,8 +512,8 @@
       }
       currentUser = {
         ...packet.user,
-        countGroups: packet.user.role === 'contador'
-          ? normalizeCountGroups(localSession?.countGroups)
+        countGroups: localSession?.countGroups?.length
+          ? normalizeCountGroups(localSession.countGroups)
           : [],
         loginAt: localSession?.loginAt || new Date().toISOString(),
       };
@@ -523,21 +524,43 @@
   }
 
   async function checkSelectedGroupAvailability() {
-    const groups = selectedLoginCountGroups();
+    const selectedGroups = selectedLoginCountGroups();
     const error = document.getElementById('loginError');
-    if (groups.length === 0) {
-      error.textContent = '';
-      return;
-    }
     try {
       const packet = await apiRequest(ASSIGNMENTS_API_URL, {
         method: 'POST',
-        body: JSON.stringify({event: state.event, countGroups: groups}),
+        body: JSON.stringify({event: state.event, countGroups: assignableGroupIds}),
       });
       const conflicts = packet.conflicts || [];
-      error.textContent = conflicts.length
-        ? `Já em uso: ${conflicts.map((item) => `${groupLabel(item.groupId)} por ${item.userName}`).join(', ')}.`
+      const byGroup = new Map(conflicts.map((item) => [item.groupId, item]));
+      const selectedConflicts = conflicts.filter((item) => selectedGroups.includes(item.groupId));
+
+      document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
+        const conflict = byGroup.get(input.value);
+        const label = input.closest('label');
+        label.querySelector('.group-occupied-note')?.remove();
+        input.disabled = Boolean(conflict);
+        label.classList.toggle('is-group-occupied', Boolean(conflict));
+        if (conflict) {
+          input.checked = false;
+          const note = document.createElement('small');
+          note.className = 'group-occupied-note';
+          note.textContent = `Em contagem por ${conflict.userName}`;
+          label.appendChild(note);
+        }
+      });
+
+      document.getElementById('groupAvailabilityMessage').textContent = conflicts.length
+        ? `${conflicts.length} grupo(s) já estão em contagem. Os itens ocupados ficam bloqueados.`
+        : 'Todos os grupos estão disponíveis para este evento.';
+      error.textContent = selectedConflicts.length
+        ? `Grupo já em contagem por ${selectedConflicts.map((item) => item.userName).join(', ')}.`
         : '';
+      if (selectedConflicts.length) {
+        window.alert(selectedConflicts.map((item) => (
+          `${groupLabel(item.groupId)} já está em contagem pelo usuário ${item.userName}.`
+        )).join('\n'));
+      }
     } catch (requestError) {
       error.textContent = requestError.message;
     }
@@ -702,7 +725,7 @@
         username: updatedCurrentUser.username,
         name: updatedCurrentUser.name,
         role: updatedCurrentUser.role,
-        countGroups: updatedCurrentUser.role === 'contador'
+        countGroups: currentUser.countGroups?.length
           ? normalizeCountGroups(currentUser.countGroups || currentUser.countGroup)
           : [],
         loginAt: currentUser.loginAt,
@@ -1068,7 +1091,7 @@
 
   function countCatalog() {
     const availableGroups = activeCatalog();
-    if (currentUser?.role !== 'contador') return availableGroups;
+    if (!currentUser?.countGroups?.length) return availableGroups;
 
     const allowedGroups = normalizeCountGroups(currentUser.countGroups || currentUser.countGroup);
     return availableGroups.filter((group) => allowedGroups.includes(group.id));
