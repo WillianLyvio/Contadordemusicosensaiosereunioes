@@ -778,9 +778,7 @@
       return;
     }
 
-    document.getElementById('currentUserChip').textContent = currentUser.countGroups?.length
-      ? `${currentUser.name} | ${currentUser.role} | ${groupLabels(currentUser.countGroups)}`
-      : `${currentUser.name} | ${currentUser.role}`;
+    document.getElementById('currentUserChip').textContent = currentUser.name;
 
     document.querySelectorAll('.admin-only').forEach((element) => {
       element.classList.toggle('is-hidden', !isAdmin());
