@@ -1,137 +1,77 @@
 <?php
 declare(strict_types=1);
 
-header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'bootstrap.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'message' => 'Metodo nao permitido.']);
-    exit;
-}
+try {
+    $admin = requireAdmin();
+    $db = database();
 
-$usersFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'users.json';
-$rawBody = file_get_contents('php://input') ?: '';
-$payload = json_decode($rawBody, true);
-
-if (!is_array($payload)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'message' => 'JSON invalido.']);
-    exit;
-}
-
-$currentPacket = readUsersPacket($usersFile);
-$currentUsers = normalizeUsers($currentPacket['users'] ?? []);
-$adminUsername = normalizeUsername((string)($payload['adminUsername'] ?? ''));
-$adminPassword = (string)($payload['adminPassword'] ?? '');
-
-$isAuthorized = false;
-foreach ($currentUsers as $user) {
-    if (
-        $user['username'] === $adminUsername
-        && $user['password'] === $adminPassword
-        && $user['role'] === 'administrador'
-    ) {
-        $isAuthorized = true;
-        break;
-    }
-}
-
-if (!$isAuthorized) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'message' => 'Senha do administrador invalida.']);
-    exit;
-}
-
-$nextUsers = normalizeUsers($payload['users'] ?? []);
-if (count($nextUsers) === 0) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'message' => 'Lista de usuarios vazia.']);
-    exit;
-}
-
-$hasAdmin = false;
-foreach ($nextUsers as $user) {
-    if ($user['role'] === 'administrador') {
-        $hasAdmin = true;
-        break;
-    }
-}
-
-if (!$hasAdmin) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'message' => 'Mantenha pelo menos um administrador.']);
-    exit;
-}
-
-$packet = [
-    'schemaVersion' => 1,
-    'updatedAt' => gmdate('c'),
-    'users' => $nextUsers,
-];
-
-$encoded = json_encode($packet, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-if ($encoded === false) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'message' => 'Falha ao gerar JSON.']);
-    exit;
-}
-
-if (file_put_contents($usersFile, $encoded . PHP_EOL, LOCK_EX) === false) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'message' => 'Nao foi possivel gravar data/users.json.']);
-    exit;
-}
-
-echo json_encode(['ok' => true, 'users' => $nextUsers], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-function readUsersPacket(string $usersFile): array
-{
-    if (!is_file($usersFile)) {
-        return ['users' => []];
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $users = $db->query(
+            'SELECT id, username, name, role FROM users WHERE active = TRUE ORDER BY name, username'
+        )->fetchAll();
+        jsonResponse(['ok' => true, 'users' => array_map('publicUser', $users)]);
     }
 
-    $content = file_get_contents($usersFile);
-    if ($content === false) {
-        return ['users' => []];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        jsonResponse(['ok' => false, 'message' => 'Método não permitido.'], 405);
     }
 
-    $packet = json_decode($content, true);
-    return is_array($packet) ? $packet : ['users' => []];
-}
+    $body = jsonBody();
+    $action = (string) ($body['action'] ?? 'save');
+    $username = strtolower(trim((string) ($body['username'] ?? '')));
 
-function normalizeUsers($users): array
-{
-    if (!is_array($users)) {
-        return [];
-    }
-
-    $byUsername = [];
-    foreach ($users as $user) {
-        if (!is_array($user)) {
-            continue;
+    if ($action === 'delete') {
+        if ($username === $admin['username']) {
+            jsonResponse(['ok' => false, 'message' => 'Não é possível excluir o usuário logado.'], 400);
         }
-
-        $username = normalizeUsername((string)($user['username'] ?? ''));
-        $password = (string)($user['password'] ?? '');
-        $name = trim((string)($user['name'] ?? $username));
-        $role = ($user['role'] ?? '') === 'administrador' ? 'administrador' : 'contador';
-
-        if ($username === '' || $password === '' || !preg_match('/^[a-z0-9._-]{3,}$/', $username)) {
-            continue;
-        }
-
-        $byUsername[$username] = [
-            'username' => $username,
-            'password' => $password,
-            'name' => $name !== '' ? $name : $username,
-            'role' => $role,
-        ];
+        $statement = $db->prepare('UPDATE users SET active = FALSE, updated_at = NOW() WHERE username = :username');
+        $statement->execute(['username' => $username]);
+        jsonResponse(['ok' => true]);
     }
 
-    return array_values($byUsername);
-}
+    $originalUsername = strtolower(trim((string) ($body['originalUsername'] ?? $username)));
+    $name = trim((string) ($body['name'] ?? ''));
+    $role = ($body['role'] ?? '') === 'administrador' ? 'administrador' : 'contador';
+    $password = (string) ($body['password'] ?? '');
 
-function normalizeUsername(string $username): string
-{
-    return strtolower(trim($username));
+    if (!preg_match('/^[a-z0-9._-]{3,80}$/', $username) || $name === '') {
+        jsonResponse(['ok' => false, 'message' => 'Dados do usuário inválidos.'], 400);
+    }
+
+    $existingStatement = $db->prepare('SELECT id, password_hash FROM users WHERE username = :username');
+    $existingStatement->execute(['username' => $originalUsername]);
+    $existing = $existingStatement->fetch();
+    if (!$existing && $password === '') {
+        jsonResponse(['ok' => false, 'message' => 'Informe a senha do novo usuário.'], 400);
+    }
+
+    $passwordHash = $password !== '' ? password_hash($password, PASSWORD_DEFAULT) : $existing['password_hash'];
+    if ($existing) {
+        $statement = $db->prepare(
+            'UPDATE users SET username = :username, password_hash = :password_hash, name = :name,
+             role = :role, active = TRUE, updated_at = NOW() WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $existing['id'], 'username' => $username, 'password_hash' => $passwordHash,
+            'name' => $name, 'role' => $role,
+        ]);
+    } else {
+        $statement = $db->prepare(
+            'INSERT INTO users (username, password_hash, name, role) VALUES (:username, :password_hash, :name, :role)'
+        );
+        $statement->execute([
+            'username' => $username, 'password_hash' => $passwordHash, 'name' => $name, 'role' => $role,
+        ]);
+    }
+
+    jsonResponse(['ok' => true]);
+} catch (PDOException $error) {
+    if ($error->getCode() === '23505') {
+        jsonResponse(['ok' => false, 'message' => 'Já existe um usuário com este login.'], 409);
+    }
+    apiFailure($error);
+} catch (Throwable $error) {
+    apiFailure($error);
 }

@@ -5,8 +5,9 @@
   const AUTH_SESSION_KEY = 'contador-musicos-auth-v1';
   const ACCESS_LOG_KEY = 'contador-musicos-access-logs-v1';
   const USER_STORAGE_KEY = 'contador-musicos-users-v1';
-  const USER_DATA_URL = 'data/users.json';
+  const AUTH_API_URL = 'api/auth.php';
   const USER_API_URL = 'api/users.php';
+  const SYNC_API_URL = 'api/sync.php';
   const FALLBACK_USER_ACCOUNTS = [
     {
       username: 'admin',
@@ -23,6 +24,8 @@
   ];
   let projectUserAccounts = [];
   let adminFilePassword = '';
+  let syncTimer = null;
+  let syncInProgress = false;
 
   const catalog = [
     {
@@ -140,15 +143,18 @@
   document.addEventListener('DOMContentLoaded', init);
 
   async function init() {
-    await refreshProjectUserAccounts();
-    currentUser = loadSession();
+    await restoreServerSession();
+    if (isAdmin()) await refreshProjectUserAccounts();
     bindAuth();
     bindTabs();
     bindActions();
     bindInputs();
     bindUserManagement();
     renderAuth();
-    if (currentUser) render();
+    if (currentUser) {
+      render();
+      await loadRemoteCounts(false);
+    }
     registerServiceWorker();
   }
 
@@ -171,40 +177,30 @@
   function bindAuth() {
     document.getElementById('loginUser').addEventListener('input', renderLoginGroupRequirement);
     document.getElementById('loginUser').addEventListener('change', renderLoginGroupRequirement);
-    document.getElementById('loginImportUsers').addEventListener('change', importUsersFile);
 
     document.getElementById('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
-      await refreshProjectUserAccounts();
-      renderLoginGroupRequirement();
       const username = normalizeUsername(document.getElementById('loginUser').value);
       const password = document.getElementById('loginPassword').value;
-      const account = readUserAccounts().find((user) => (
-        user.username === username && user.password === password
-      ));
+      const response = await apiRequest(AUTH_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({username, password}),
+      }).catch((error) => ({ok: false, message: error.message}));
 
-      if (!account) {
-        document.getElementById('loginError').textContent = 'Usuário ou senha inválidos.';
+      if (!response.ok || !response.user) {
+        document.getElementById('loginError').textContent = response.message || 'Usuário ou senha inválidos.';
         writeAccessLog('login_failed', username || 'sem usuario');
         return;
       }
 
-      const countGroups = account.role === 'contador'
-        ? selectedLoginCountGroups()
-        : [];
-
-      if (account.role === 'contador' && countGroups.length === 0) {
+      const countGroups = response.user.role === 'contador' ? selectedLoginCountGroups() : [];
+      if (response.user.role === 'contador' && countGroups.length === 0) {
+        await apiRequest(AUTH_API_URL, {method: 'DELETE'}).catch(() => null);
         document.getElementById('loginError').textContent = 'Selecione ao menos um grupo para contagem.';
         return;
       }
 
-      currentUser = {
-        username: account.username,
-        name: account.name,
-        role: account.role,
-        countGroups,
-        loginAt: new Date().toISOString(),
-      };
+      currentUser = {...response.user, countGroups, loginAt: new Date().toISOString()};
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
       if (currentUser.countGroups.length > 0) {
         state.selectedGroup = currentUser.countGroups[0];
@@ -216,6 +212,8 @@
         : 'Entrada no sistema');
       renderAuth();
       render();
+      if (isAdmin()) await refreshProjectUserAccounts();
+      await loadRemoteCounts(false);
     });
   }
 
@@ -226,20 +224,12 @@
   }
 
   function renderLoginGroupRequirement() {
-    const username = normalizeUsername(document.getElementById('loginUser').value);
-    const account = readUserAccounts().find((user) => user.username === username);
-    const isCounter = account?.role === 'contador';
-    document.getElementById('loginGroupField').classList.toggle('is-hidden', !isCounter);
-    if (!isCounter) {
-      document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
-        input.checked = false;
-      });
-    }
+    document.getElementById('loginGroupField').classList.remove('is-hidden');
   }
 
   function bindActions() {
     document.querySelectorAll('[data-action]').forEach((button) => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const action = button.dataset.action;
         if (action === 'save') {
           saveState();
@@ -247,29 +237,20 @@
           showToast('Dados salvos neste aparelho.');
         }
         if (action === 'print') {
+          await synchronizeCounts(false);
           state.activeTab = 'report';
           saveState();
           writeAccessLog('print_report', 'Relatório enviado para impressão/PDF');
           render();
           window.setTimeout(() => window.print(), 80);
         }
-        if (action === 'export') exportDeviceCounts();
-        if (action === 'export-final') exportFinalReport();
+        if (action === 'sync-now') synchronizeCounts(true);
         if (action === 'logout') logout();
-        if (action === 'export-users') exportUsers();
         if (action === 'export-logs') exportAccessLogs();
         if (action === 'clear-logs') clearAccessLogs();
-        if (action === 'clear-imports') {
-          state.imports = {};
-          saveState();
-          writeAccessLog('clear_imports', 'Importações removidas');
-          render();
-          showToast('Importações removidas.');
-        }
       });
     });
 
-    document.getElementById('importFiles').addEventListener('change', importFiles);
   }
 
   function bindUserManagement() {
@@ -279,7 +260,6 @@
     });
 
     document.getElementById('cancelUserEdit').addEventListener('click', resetUserForm);
-    document.getElementById('adminImportUsers').addEventListener('change', importUsersFile);
 
     document.getElementById('userTableBody').addEventListener('click', async (event) => {
       const button = event.target.closest('[data-user-action]');
@@ -318,23 +298,11 @@
 
   async function refreshProjectUserAccounts() {
     try {
-      const response = await fetch(USER_DATA_URL, {
-        cache: 'no-store',
-      });
-      if (!response.ok) throw new Error('users file not found');
-
-      const packet = await response.json();
-      const users = Array.isArray(packet) ? packet : packet.users;
-      const normalized = normalizeUserList(users);
-      if (!normalized.some((user) => user.role === 'administrador')) {
-        throw new Error('users file needs an administrator');
-      }
-
-      projectUserAccounts = normalized;
+      if (!isAdmin()) return projectUserAccounts;
+      const packet = await apiRequest(USER_API_URL);
+      projectUserAccounts = normalizeUserList(packet.users);
     } catch (error) {
-      if (projectUserAccounts.length === 0) {
-        projectUserAccounts = normalizeUserList(FALLBACK_USER_ACCOUNTS);
-      }
+      showToast(error.message);
     }
 
     return projectUserAccounts;
@@ -347,7 +315,7 @@
 
   function normalizeUserList(users) {
     return uniqueUsers((Array.isArray(users) ? users : []).filter((user) => (
-      user?.username && user?.password && user?.role
+      user?.username && user?.role
     )));
   }
 
@@ -477,7 +445,7 @@
     users.forEach((user) => {
       byUsername.set(normalizeUsername(user.username), {
         username: normalizeUsername(user.username),
-        password: String(user.password),
+        password: String(user.password || ''),
         name: String(user.name || user.username),
         role: normalizeRole(user.role),
       });
@@ -505,14 +473,12 @@
       if (!raw) return null;
 
       const session = JSON.parse(raw);
-      const account = readUserAccounts().find((user) => user.username === session.username);
-      if (!account) return null;
-
       return {
-        username: account.username,
-        name: account.name,
-        role: account.role,
-        countGroups: account.role === 'contador'
+        id: session.id,
+        username: session.username,
+        name: session.name,
+        role: session.role,
+        countGroups: session.role === 'contador'
           ? normalizeCountGroups(session.countGroups || session.countGroup)
           : [],
         loginAt: session.loginAt || new Date().toISOString(),
@@ -522,11 +488,48 @@
     }
   }
 
-  function logout() {
+  async function restoreServerSession() {
+    const localSession = loadSession();
+    try {
+      const packet = await apiRequest(AUTH_API_URL);
+      if (!packet.user) {
+        currentUser = null;
+        localStorage.removeItem(AUTH_SESSION_KEY);
+        return;
+      }
+      currentUser = {
+        ...packet.user,
+        countGroups: packet.user.role === 'contador'
+          ? normalizeCountGroups(localSession?.countGroups)
+          : [],
+        loginAt: localSession?.loginAt || new Date().toISOString(),
+      };
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
+    } catch (error) {
+      currentUser = null;
+    }
+  }
+
+  async function logout() {
     writeAccessLog('logout', 'Saída do sistema');
+    await apiRequest(AUTH_API_URL, {method: 'DELETE'}).catch(() => null);
     localStorage.removeItem(AUTH_SESSION_KEY);
     currentUser = null;
     renderAuth();
+  }
+
+  async function apiRequest(url, options = {}) {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', ...(options.headers || {})},
+      ...options,
+    });
+    const packet = await response.json().catch(() => ({}));
+    if (!response.ok || packet.ok === false) {
+      throw new Error(packet.message || 'Não foi possível comunicar com o servidor.');
+    }
+    return packet;
   }
 
   function renderAuth() {
@@ -641,52 +644,27 @@
       return;
     }
 
-    const users = readUserAccounts();
-    const existing = users.find((user) => user.username === (editKey || username));
-    const duplicate = users.some((user) => user.username === username && user.username !== editKey);
-
-    if (duplicate) {
-      showToast('Já existe um usuário com este login.');
-      return;
-    }
-
+    const existing = projectUserAccounts.find((user) => user.username === (editKey || username));
     if (!existing && !password) {
       showToast('Informe uma senha para o novo usuário.');
       return;
     }
 
-    const nextUsers = users.filter((user) => user.username !== editKey && user.username !== username);
-    nextUsers.push({
-      username,
-      name,
-      password: password || existing?.password || '',
-      role,
-    });
-
-    if (!nextUsers.some((user) => user.role === 'administrador')) {
-      showToast('É necessário manter pelo menos um administrador.');
-      return;
-    }
-
-    let savedGlobally = false;
-    let syncError = null;
     try {
-      savedGlobally = await syncUsersFile(nextUsers);
+      await apiRequest(USER_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'save', originalUsername: editKey || username, username, name, role, password,
+        }),
+      });
+      await refreshProjectUserAccounts();
     } catch (error) {
-      syncError = error;
-    }
-
-    if (!savedGlobally && editKey && username !== editKey && isProjectFileUser(editKey)) {
-      showToast('Nao foi possivel renomear o usuario no arquivo.');
+      showToast(error.message);
       return;
     }
-
-    saveUserAccounts(nextUsers, {
-      includeProjectUsers: !savedGlobally && (isProjectFileUser(username) || isProjectFileUser(editKey)),
-    });
 
     if (currentUser?.username === editKey || currentUser?.username === username) {
-      const updatedCurrentUser = readUserAccounts().find((user) => user.username === username);
+      const updatedCurrentUser = projectUserAccounts.find((user) => user.username === username);
       currentUser = {
         username: updatedCurrentUser.username,
         name: updatedCurrentUser.name,
@@ -702,25 +680,13 @@
     writeAccessLog(existing ? 'update_user' : 'create_user', username);
     resetUserForm();
     render();
-    if (savedGlobally) {
-      showToast(existing ? 'Usuario atualizado no arquivo.' : 'Usuario criado no arquivo.');
-      return;
-    }
-
-    if (syncError) {
-      showToast(existing
-        ? 'Nao foi possivel atualizar o arquivo; usuario atualizado neste aparelho.'
-        : 'Nao foi possivel atualizar o arquivo; usuario criado neste aparelho.');
-      return;
-    }
-
-    showToast(existing ? 'Usuario atualizado neste aparelho.' : 'Usuario criado neste aparelho.');
+    showToast(existing ? 'Usuário atualizado no Neon.' : 'Usuário criado no Neon.');
   }
 
   function editUser(username) {
     if (!isAdmin()) return;
 
-    const user = readUserAccounts().find((item) => item.username === username);
+    const user = projectUserAccounts.find((item) => item.username === username);
     if (!user) return;
 
     document.getElementById('userEditKey').value = user.username;
@@ -739,46 +705,32 @@
       return;
     }
 
-    const users = readUserAccounts();
-    const user = users.find((item) => item.username === username);
+    const user = projectUserAccounts.find((item) => item.username === username);
     if (!user) return;
-    const projectUser = isProjectFileUser(username);
-
-    const nextUsers = users.filter((item) => item.username !== username);
-    if (!nextUsers.some((item) => item.role === 'administrador')) {
-      showToast('É necessário manter pelo menos um administrador.');
-      return;
-    }
 
     const confirmation = window.confirm(`Deseja excluir o usuário ${user.name}?`);
     if (!confirmation) return;
 
-    let savedGlobally = false;
     try {
-      savedGlobally = await syncUsersFile(nextUsers);
+      await apiRequest(USER_API_URL, {
+        method: 'POST', body: JSON.stringify({action: 'delete', username}),
+      });
+      await refreshProjectUserAccounts();
     } catch (error) {
       showToast(error.message);
-    }
-
-    if (!savedGlobally && projectUser) {
-      showToast('Nao foi possivel excluir o usuario do arquivo.');
       return;
     }
-
-    saveUserAccounts(nextUsers);
     writeAccessLog('delete_user', username);
     resetUserForm();
     render();
-    showToast(savedGlobally ? 'Usuario excluido do arquivo.' : 'Usuario excluido deste aparelho.');
+    showToast('Usuário excluído do Neon.');
   }
 
   async function resetUserPassword(username) {
     if (!isAdmin()) return;
 
-    const users = readUserAccounts();
-    const user = users.find((item) => item.username === username);
+    const user = projectUserAccounts.find((item) => item.username === username);
     if (!user) return;
-    const projectUser = isProjectFileUser(username);
 
     const newPassword = window.prompt(`Informe a nova senha para ${user.name}:`);
     if (newPassword === null) return;
@@ -788,30 +740,21 @@
       return;
     }
 
-    const updatedUsers = users.map((item) => (
-      item.username === username
-        ? {...item, password: newPassword.trim()}
-        : item
-    ));
-    let savedGlobally = false;
-    let syncError = null;
     try {
-      savedGlobally = await syncUsersFile(updatedUsers);
+      await apiRequest(USER_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'save', originalUsername: username, username,
+          name: user.name, role: user.role, password: newPassword.trim(),
+        }),
+      });
     } catch (error) {
-      syncError = error;
-    }
-
-    saveUserAccounts(updatedUsers, {includeProjectUsers: !savedGlobally && projectUser});
-    writeAccessLog('reset_password', username);
-    render();
-    if (savedGlobally) {
-      showToast('Senha redefinida no arquivo.');
+      showToast(error.message);
       return;
     }
-
-    showToast(syncError
-      ? 'Nao foi possivel atualizar o arquivo; senha redefinida neste aparelho.'
-      : 'Senha redefinida neste aparelho.');
+    writeAccessLog('reset_password', username);
+    render();
+    showToast('Senha redefinida no Neon.');
   }
 
   function resetUserForm() {
@@ -939,6 +882,69 @@
 
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    scheduleSynchronization();
+  }
+
+  function scheduleSynchronization() {
+    if (!currentUser) return;
+    window.clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(() => synchronizeCounts(false), 900);
+  }
+
+  async function synchronizeCounts(showResult = false) {
+    if (!currentUser || syncInProgress || !state.event.date || !state.event.type) return;
+    syncInProgress = true;
+    try {
+      await apiRequest(SYNC_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          event: state.event,
+          deviceId: state.deviceId,
+          deviceName: state.deviceName,
+          counts: normalizeCounts(state.counts),
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+      await loadRemoteCounts(false);
+      writeAccessLog('sync_counts', 'Contagem sincronizada com o Neon');
+      if (showResult) showToast('Contagem sincronizada e relatório consolidado atualizado.');
+    } catch (error) {
+      if (showResult) showToast(`${error.message} Os dados continuam salvos neste aparelho.`);
+    } finally {
+      syncInProgress = false;
+    }
+  }
+
+  async function loadRemoteCounts(renderAfter = true) {
+    if (!currentUser || !state.event.date || !state.event.type) return;
+    const query = new URLSearchParams({
+      date: state.event.date,
+      type: state.event.type,
+      name: state.event.name || '',
+      local: state.event.local || '',
+    });
+    try {
+      const packet = await apiRequest(`${SYNC_API_URL}?${query}`);
+      state.imports = {};
+      (packet.devices || []).forEach((device) => {
+        if (device.deviceId === state.deviceId) return;
+        state.imports[device.deviceId] = {
+          schemaVersion: 1,
+          kind: 'device-counts',
+          deviceId: device.deviceId,
+          deviceName: device.deviceName,
+          exportedAt: device.updatedAt,
+          event: {...state.event},
+          counts: normalizeCounts(device.counts),
+          username: device.username,
+          userName: device.userName,
+        };
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (renderAfter) render();
+    } catch (error) {
+      if (renderAfter) showToast(`${error.message} Exibindo a última consolidação disponível.`);
+    }
   }
 
   function render() {
@@ -1123,7 +1129,7 @@
     document.getElementById('summaryStrip').innerHTML = [
       ['Grupo neste aparelho', selectedSubtotal],
       ['Total neste aparelho', localTotals.totalGeralPresentes],
-      ['Celulares importados', importedDevices],
+      ['Outros aparelhos', importedDevices],
       ['Total consolidado', mergedTotals.totalGeralPresentes],
     ].map(([label, value]) => `
       <div class="summary-card">
@@ -1140,7 +1146,7 @@
     const list = document.getElementById('importList');
 
     if (imports.length === 0) {
-      list.innerHTML = '<p class="muted">Nenhum celular importado ainda.</p>';
+      list.innerHTML = '<p class="muted">Nenhum outro aparelho sincronizado neste evento.</p>';
       return;
     }
 
@@ -1149,8 +1155,8 @@
       return `
         <div class="import-item">
           <strong>${escapeHtml(packet.deviceName || 'Aparelho sem nome')}</strong>
-          <span>Data: ${formatDate(packet.event?.date)} | Total importado: ${totals.totalGeralPresentes}</span>
-          <span>Recebido de ${escapeHtml(packet.deviceId || '')} em ${formatDateTime(packet.exportedAt)}</span>
+          <span>Data: ${formatDate(packet.event?.date)} | Total registrado: ${totals.totalGeralPresentes}</span>
+          <span>Sincronizado por ${escapeHtml(packet.userName || packet.username || packet.deviceId || '')} em ${formatDateTime(packet.exportedAt)}</span>
         </div>
       `;
     }).join('');
@@ -1186,7 +1192,7 @@
 
     metaRows.push(
       ['Região', state.event.region || '-'],
-      ['Aparelhos importados', String(Object.keys(state.imports).length)],
+      ['Outros aparelhos sincronizados', String(Object.keys(state.imports).length)],
     );
 
     document.getElementById('reportMeta').innerHTML = metaRows.map(([label, value]) => `
@@ -1233,16 +1239,12 @@
   }
 
   function renderUsers() {
-    const users = readUserAccounts()
+    const users = [...projectUserAccounts]
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
     document.getElementById('userTableBody').innerHTML = users.map((user) => {
       const isCurrent = currentUser?.username === user.username;
-      const projectUser = isProjectFileUser(user.username);
-      const storedUser = isStoredUser(user.username);
-      const sourceTag = storedUser
-        ? ' <span class="source-tag">local</span>'
-        : (projectUser ? ' <span class="source-tag">arquivo</span>' : '');
+      const sourceTag = ' <span class="source-tag">Neon</span>';
       return `
         <tr>
           <td>${escapeHtml(user.name)}${isCurrent ? ' <strong>(logado)</strong>' : ''}</td>
@@ -1284,6 +1286,7 @@
       print_report: 'Imprimiu relatório',
       reset_password: 'Resetou senha',
       save: 'Salvou dados',
+      sync_counts: 'Sincronizou contagem',
       update_user: 'Atualizou usuário',
     };
 
@@ -1369,20 +1372,40 @@
     if (files.length === 0) return;
 
     let imported = 0;
-    let skipped = 0;
+    let replaced = 0;
+    let adoptedEvent = false;
+    const skippedReasons = {
+      invalid: 0,
+      incompatibleDate: 0,
+      incompatibleType: 0,
+      sameDevice: 0,
+      older: 0,
+      readError: 0,
+    };
+
     for (const file of files) {
       try {
         const packet = JSON.parse(await file.text());
         if (!isValidPacket(packet)) {
-          skipped++;
+          skippedReasons.invalid++;
           continue;
         }
+
+        if (!isCompatiblePacket(packet) && canAdoptImportEvent(packet)) {
+          adoptEventFromPacket(packet);
+          adoptedEvent = true;
+        }
+
         if (!isCompatiblePacket(packet)) {
-          skipped++;
+          if (packet.event?.date !== state.event.date) {
+            skippedReasons.incompatibleDate++;
+          } else {
+            skippedReasons.incompatibleType++;
+          }
           continue;
         }
         if (packet.deviceId === state.deviceId) {
-          skipped++;
+          skippedReasons.sameDevice++;
           continue;
         }
 
@@ -1393,20 +1416,24 @@
             ...packet,
             counts: normalizeCounts(packet.counts),
           };
-          imported++;
+          if (previous) {
+            replaced++;
+          } else {
+            imported++;
+          }
         } else {
-          skipped++;
+          skippedReasons.older++;
         }
       } catch (error) {
-        skipped++;
+        skippedReasons.readError++;
       }
     }
 
     event.target.value = '';
     saveState();
-    writeAccessLog('import_counts', `${imported} arquivo(s) importado(s), ${skipped} ignorado(s)`);
+    writeAccessLog('import_counts', importSummary(imported, replaced, skippedReasons, adoptedEvent));
     render();
-    showToast(`${imported} arquivo(s) importado(s). ${skipped} ignorado(s).`);
+    showToast(importSummary(imported, replaced, skippedReasons, adoptedEvent));
   }
 
   function buildPacket(kind, counts) {
@@ -1423,13 +1450,72 @@
   }
 
   function isValidPacket(packet) {
-    return packet
+    return Boolean(packet
       && packet.schemaVersion === 1
       && ['device-counts', 'final-report'].includes(packet.kind)
       && packet.deviceId
       && packet.event
       && packet.event.date
-      && packet.counts;
+      && packet.counts);
+  }
+
+  function canAdoptImportEvent(packet) {
+    return isValidPacket(packet)
+      && Object.keys(state.imports).length === 0
+      && !hasAnyCount(state.counts)
+      && Boolean(packet.event?.date)
+      && eventTypes.includes(packet.event?.type);
+  }
+
+  function adoptEventFromPacket(packet) {
+    state.event = {
+      ...state.event,
+      name: packet.event.name || state.event.name,
+      type: packet.event.type,
+      date: packet.event.date,
+      local: packet.event.local || state.event.local,
+      regionalLeader: packet.event.regionalLeader || state.event.regionalLeader,
+      elder: packet.event.elder || state.event.elder,
+      region: packet.event.region || state.event.region,
+    };
+    ensureSelectedGroup();
+  }
+
+  function hasAnyCount(counts) {
+    const normalized = normalizeCounts(counts);
+    return catalog.some((group) => (
+      group.items.some(([itemId]) => safeNumber(normalized[group.id][itemId]) > 0)
+    ));
+  }
+
+  function importSummary(imported, replaced, skippedReasons, adoptedEvent) {
+    const skipped = Object.values(skippedReasons).reduce((sum, value) => sum + value, 0);
+    const parts = [`${imported} arquivo(s) importado(s)`];
+
+    if (replaced > 0) parts.push(`${replaced} substituido(s)`);
+    if (skipped > 0) {
+      const reasons = importSkipReasonLabels(skippedReasons);
+      parts.push(`${skipped} ignorado(s)${reasons ? `: ${reasons}` : ''}`);
+    }
+    if (adoptedEvent) {
+      parts.push(`evento ajustado para ${formatDate(state.event.date)} - ${state.event.type}`);
+    }
+
+    return `${parts.join('. ')}.`;
+  }
+
+  function importSkipReasonLabels(reasons) {
+    return [
+      [reasons.incompatibleDate, 'data diferente'],
+      [reasons.incompatibleType, 'tipo diferente'],
+      [reasons.sameDevice, 'mesmo aparelho'],
+      [reasons.older, 'versao antiga'],
+      [reasons.invalid, 'arquivo invalido'],
+      [reasons.readError, 'erro de leitura'],
+    ]
+      .filter(([count]) => count > 0)
+      .map(([count, label]) => `${count} ${label}`)
+      .join(', ');
   }
 
   function mergedCounts() {

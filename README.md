@@ -1,135 +1,68 @@
 # Contador de Músicos
 
-Sistema web responsivo para celulares, tablets e computadores, feito com PHP, JavaScript e CSS. A aplicação funciona sem banco de dados e sem servidor de sincronização: cada aparelho salva sua própria contagem no navegador e, ao final do dia, o coordenador importa os arquivos dos celulares para gerar um único relatório consolidado.
+Sistema web responsivo em PHP, JavaScript e CSS para registrar contagens em vários celulares e gerar um relatório consolidado. O PostgreSQL do Neon centraliza usuários, eventos e contagens.
 
-## Versão Atual
+## Fluxo atual
 
-A versão principal está em `public/`.
+1. O usuário entra com uma conta armazenada no Neon.
+2. Todos os aparelhos preenchem os mesmos dados do evento: data, tipo, nome e local.
+3. Cada aparelho registra sua parte da contagem.
+4. As alterações ficam no `localStorage` e são sincronizadas automaticamente com o Neon.
+5. O banco mantém uma contagem por evento e aparelho; uma nova sincronização substitui a versão anterior do mesmo aparelho.
+6. A aba `Consolidar` mostra os demais aparelhos do evento.
+7. O relatório soma a contagem local com os registros recebidos do Neon e pode ser impresso ou salvo em PDF.
 
-```text
-public/
-  index.php                 Entrada PHP opcional
-  index.html                Entrada estática sem PHP
-  manifest.webmanifest      Configuração PWA
-  service-worker.js         Cache offline
-  api/users.php             Grava usuários no JSON quando rodar com PHP
-  data/users.json           Usuários consultados no login
-  assets/
-    css/app.css             Interface responsiva branco/cinza
-    js/app.js               Contagem, armazenamento e relatório
-    img/logo-ccb-light.svg  Logo correta usada no sistema
-    img/logo-ccb.svg        Alias do mesmo arquivo para compatibilidade
+Não é mais necessário exportar ou importar arquivos JSON para consolidar a contagem.
+
+## Requisitos
+
+- PHP 8.1 ou superior;
+- extensão `pdo_pgsql`;
+- PostgreSQL no Neon;
+- variável de ambiente `DATABASE_URL`;
+- HTTPS em produção.
+
+## Configuração do Neon
+
+No desenvolvimento local, copie `.env.example` para `.env` e informe a cadeia completa de conexão:
+
+```env
+DATABASE_URL="postgresql://usuario:senha@endpoint/neondb?sslmode=require"
 ```
 
-## Como Funciona Sem Servidor
+O `.env` está ignorado pelo Git. Em produção, configure `DATABASE_URL` diretamente no painel da hospedagem.
 
-O sistema usa `localStorage` no próprio navegador. Isso significa:
-
-- cada celular guarda sua contagem localmente;
-- não existe banco de dados remoto;
-- o login é local e consulta um arquivo JSON do projeto;
-- não existe dependência de Firebase ou outro backend;
-- o relatório final é feito em um aparelho coordenador.
-
-## Login e Perfis
-
-O controle de acesso consulta o arquivo `public/data/users.json` sempre que alguém tenta fazer login.
-
-Usuários salvos no arquivo do projeto:
-
-```text
-admin / admin123
-contador / contador123
-```
-
-Quando o sistema estiver rodando com PHP, usuários criados, editados, excluídos ou com senha resetada na tela `Admin` atualizam `public/data/users.json` e passam a funcionar em qualquer aparelho que abrir a mesma instalação. Se o sistema estiver aberto como site estático, o navegador não consegue gravar arquivos do projeto; nesse caso o usuário fica salvo apenas no aparelho local.
-
-Perfis:
-
-- `administrador`: acessa a página Admin e os logs.
-- `contador`: acessa evento, contagem, consolidação e relatório.
-
-Importante: como o sistema não usa servidor, esse login serve para controle operacional no aparelho. Para segurança forte seria necessário backend.
-
-## Login Em Outro Aparelho
-
-Usuários cadastrados em `public/data/users.json` já ficam disponíveis em qualquer aparelho que abrir a mesma instalação do sistema. Se o Admin estiver usando a versão com PHP, novos usuários entram nesse arquivo automaticamente.
-
-Se estiver usando apenas a versão estática, sem PHP, os usuários criados pela tela `Admin` ficam salvos apenas no navegador daquele aparelho. Para levar esses usuários locais para outro celular:
-
-1. Entre como `admin` no aparelho principal.
-2. Acesse `Admin`.
-3. Clique em `Exportar usuários JSON`.
-4. Envie o arquivo JSON para o outro celular.
-5. Na tela de login do outro celular, toque em `Importar usuários`.
-6. Selecione o JSON e faça login com o usuário criado.
-
-Esse arquivo contém usuários, perfis e senhas em texto legível dentro do JSON. Guarde e compartilhe apenas com pessoas autorizadas.
-
-## Logs de Acesso
-
-Os logs são salvos no `localStorage` do navegador em que o sistema está sendo usado. A página `Admin` permite:
-
-- criar usuários;
-- editar nome, senha e perfil;
-- resetar senha dos usuários;
-- excluir usuários;
-- visualizar logins, logouts, troca de telas e ações principais;
-- exportar logs em JSON;
-- limpar logs locais.
-
-Perfis administráveis:
-
-- `Administrador`: gerencia usuários, perfis e logs.
-- `Contador`: registra contagens, consolida arquivos e gera relatório.
-
-Ao entrar como `contador`, o usuário deve escolher um ou mais grupos instrumentais que vai contar. Na aba `Contagem`, ele verá somente os grupos selecionados. O administrador continua visualizando todos os grupos.
-
-Grupos disponíveis para contadores: Cordas, Teclas, Madeiras, Metais, Organistas, Ministérios e Colaboradores, Parte Musical e Oficialização.
-
-Fluxo recomendado:
-
-1. Abra o sistema em todos os celulares.
-2. Configure a mesma data do evento em todos.
-3. Cada equipe faz sua contagem pelo próprio aparelho.
-4. Cada celular acessa `Consolidar` e clica em `Exportar contagem JSON`.
-5. O coordenador recebe os arquivos JSON e importa todos em `Consolidar`.
-6. O coordenador acessa `Relatório` e clica em `Imprimir / Salvar PDF`.
-
-Se o mesmo celular for importado mais de uma vez, a versão mais recente substitui a anterior. Isso evita contagem duplicada quando alguém exporta novamente.
-
-## Rodar Para Testar
-
-Como PHP não está instalado neste ambiente, a prévia local pode ser aberta pela versão estática:
+Crie as tabelas e importe os usuários válidos de `public/data/users.json` na primeira execução:
 
 ```powershell
-python -m http.server 8790 --bind 127.0.0.1 --directory public
+php database/migrate.php
 ```
 
-Depois acesse:
+Senhas importadas são transformadas em hash por `password_hash` antes de serem gravadas no Neon. Usuários com nomes de login inválidos são ignorados.
 
-```text
-http://127.0.0.1:8790
+Teste a conexão em `/api/health.php`. A resposta esperada é:
+
+```json
+{"ok":true,"database":"connected"}
 ```
 
-Com PHP instalado, também funciona assim:
+## APIs
+
+- `api/auth.php`: login, restauração e encerramento da sessão.
+- `api/users.php`: administração central de usuários.
+- `api/sync.php`: gravação da contagem e leitura dos aparelhos do evento.
+- `api/health.php`: diagnóstico da conexão com o Neon.
+
+A autenticação usa sessão PHP com cookie `HttpOnly` e `SameSite=Lax`. As senhas não são enviadas ao frontend nem armazenadas em texto aberto no banco.
+
+## Funcionamento offline
+
+A contagem continua salva no navegador quando a internet oscila. Quando a conexão retorna, use `Consolidar > Sincronizar agora`; alterações normais também disparam sincronização automática. Login inicial e consolidação central exigem acesso ao servidor.
+
+## Execução local
 
 ```powershell
 php -S 127.0.0.1:8790 -t public
 ```
 
-## Uso Offline
-
-O projeto inclui `manifest.webmanifest` e `service-worker.js`. Depois de abrir uma vez em um navegador moderno, o app pode ficar disponível offline no aparelho, dependendo das permissões do navegador.
-
-## Relatório PDF
-
-O sistema não usa biblioteca de PDF no servidor. O relatório é renderizado em HTML/CSS e o usuário salva como PDF usando a impressão do navegador:
-
-```text
-Relatório > Imprimir / Salvar PDF
-```
-
-## Observação Importante
-
-Sem servidor central não existe sincronização automática em tempo real entre celulares. A forma confiável de juntar várias contagens sem backend é a consolidação por exportação/importação de arquivos JSON.
+Depois acesse `http://127.0.0.1:8790`.

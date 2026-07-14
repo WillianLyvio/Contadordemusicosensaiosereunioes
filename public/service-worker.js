@@ -1,8 +1,7 @@
-const CACHE_NAME = 'contador-musicos-web-v17';
+const CACHE_NAME = 'contador-musicos-web-v18';
 const ASSETS = [
   './',
   './index.html',
-  './data/users.json',
   './assets/css/app.css',
   './assets/js/app.js',
   './assets/img/logo-ccb-light.svg',
@@ -29,6 +28,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).pathname.includes('/api/')) return;
 
   event.respondWith(
     fetch(event.request).then((response) => {

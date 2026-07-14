@@ -37,13 +37,7 @@
       </fieldset>
       <button class="button primary block" type="submit">Entrar</button>
       <div class="login-error" id="loginError" role="alert"></div>
-      <div class="login-import">
-        <span>Entrando em outro aparelho?</span>
-        <label class="file-picker">
-          <input id="loginImportUsers" type="file" accept="application/json,.json">
-          Importar usuários
-        </label>
-      </div>
+      <p class="muted">Usuários e senhas são validados com segurança no banco Neon.</p>
       <div class="system-signature">Desenvolvido por Willian Lyvio - Congregacao Crista no Brasil-central-cuiaba</div>
     </form>
   </section>
@@ -83,7 +77,7 @@
       <section class="view is-active" id="view-event">
         <div class="section-heading">
           <h1>Evento do dia</h1>
-          <p>Os dados ficam salvos neste aparelho. Para juntar vários celulares, exporte e importe as contagens na aba Consolidar.</p>
+          <p>Os dados são salvos neste aparelho e sincronizados com o Neon para formar o relatório consolidado.</p>
         </div>
 
         <div class="panel form-grid">
@@ -126,12 +120,12 @@
 
         <div class="info-grid">
           <article class="panel info-card">
-            <strong>Armazenamento sem servidor</strong>
-            <p>O sistema usa o armazenamento local do navegador. Cada celular guarda sua própria contagem e exporta um arquivo JSON.</p>
+            <strong>Armazenamento seguro</strong>
+            <p>Cada alteração fica salva localmente e é sincronizada automaticamente com o PostgreSQL do Neon.</p>
           </article>
           <article class="panel info-card">
             <strong>Relatório único do dia</strong>
-            <p>Um aparelho coordenador importa os arquivos dos demais celulares e gera um único relatório consolidado.</p>
+            <p>O sistema reúne no banco as contagens de todos os aparelhos vinculados ao mesmo evento.</p>
           </article>
         </div>
       </section>
@@ -150,30 +144,18 @@
       <section class="view" id="view-sync">
         <div class="section-heading">
           <h1>Consolidação</h1>
-          <p>Sem servidor: cada celular exporta sua contagem e o coordenador importa todos os arquivos no fim do dia.</p>
-        </div>
-
-        <div class="sync-layout">
-          <article class="panel">
-            <h2>Exportar deste aparelho</h2>
-            <p class="muted">Envie este arquivo por WhatsApp, cabo, Bluetooth, e-mail ou outro meio disponível.</p>
-            <button class="button primary block" type="button" data-action="export">Exportar contagem JSON</button>
-          </article>
-
-          <article class="panel">
-            <h2>Importar de outros celulares</h2>
-            <p class="muted">Selecione um ou vários arquivos JSON. Se o mesmo aparelho for importado de novo, a versão mais recente substitui a anterior.</p>
-            <label class="file-picker">
-              <input id="importFiles" type="file" accept="application/json,.json" multiple>
-              Importar arquivos
-            </label>
-          </article>
+          <p>As contagens dos aparelhos são reunidas automaticamente no Neon pelo evento selecionado.</p>
         </div>
 
         <article class="panel">
+          <h2>Sincronização do evento</h2>
+          <p class="muted">O mesmo aparelho atualiza seu próprio registro, evitando contagens duplicadas.</p>
+          <button class="button primary" type="button" data-action="sync-now">Sincronizar agora</button>
+        </article>
+
+        <article class="panel">
           <div class="panel-title-row">
-            <h2>Celulares importados</h2>
-            <button class="button subtle" type="button" data-action="clear-imports">Limpar importações</button>
+            <h2>Aparelhos sincronizados</h2>
           </div>
           <div class="import-list" id="importList"></div>
         </article>
@@ -182,11 +164,10 @@
       <section class="view" id="view-report">
         <div class="section-heading no-print">
           <h1>Relatório final</h1>
-          <p>Este relatório soma a contagem deste aparelho com todas as importações aceitas para a mesma data.</p>
+          <p>Este relatório soma as contagens sincronizadas no Neon para o mesmo evento.</p>
         </div>
 
         <div class="report-actions no-print">
-          <button class="button" type="button" data-action="export-final">Exportar relatório JSON</button>
           <button class="button primary" type="button" data-action="print">Imprimir / Salvar PDF</button>
         </div>
 
@@ -214,7 +195,7 @@
 
           <footer class="report-footer">
             <strong>Observações:</strong>
-            relatório consolidado localmente a partir das contagens do dia importadas dos aparelhos participantes.
+            relatório consolidado a partir das contagens sincronizadas no banco de dados Neon.
           </footer>
         </article>
       </section>
@@ -222,15 +203,10 @@
       <section class="view" id="view-admin">
         <div class="section-heading">
           <h1>Administração</h1>
-          <p>Controle local de acessos registrados neste navegador.</p>
+          <p>Usuários armazenados no Neon e logs operacionais deste navegador.</p>
         </div>
 
         <div class="admin-actions">
-          <button class="button" type="button" data-action="export-users">Exportar usuários JSON</button>
-          <label class="file-picker admin-import-picker">
-            <input id="adminImportUsers" type="file" accept="application/json,.json">
-            Importar usuários JSON
-          </label>
           <button class="button" type="button" data-action="export-logs">Exportar logs JSON</button>
           <button class="button subtle" type="button" data-action="clear-logs">Limpar logs</button>
         </div>
@@ -238,7 +214,7 @@
         <article class="panel admin-panel">
           <div class="panel-title-row">
             <h2>Usuários e perfis</h2>
-            <span class="muted">Gerenciamento local deste aparelho</span>
+            <span class="muted">Gerenciamento central no Neon</span>
           </div>
 
           <form class="user-form" id="userForm">
