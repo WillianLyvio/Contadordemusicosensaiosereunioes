@@ -265,6 +265,7 @@
         }
         if (action === 'sync-now') synchronizeCounts(true);
         if (action === 'finalize-event') finalizeEvent();
+        if (action === 'reopen-event') reopenEvent(state.selectedEventKey);
         if (action === 'logout') logout();
         if (action === 'export-logs') exportAccessLogs();
         if (action === 'clear-logs') clearAccessLogs();
@@ -548,8 +549,10 @@
     });
     document.getElementById('historyFilterDate').addEventListener('change', renderEventHistory);
     document.getElementById('eventHistoryBody').addEventListener('click', (event) => {
-      const button = event.target.closest('[data-history-event]');
-      if (button) viewHistoricalReport(button.dataset.historyEvent);
+      const reportButton = event.target.closest('[data-history-event]');
+      const reopenButton = event.target.closest('[data-reopen-event]');
+      if (reportButton) viewHistoricalReport(reportButton.dataset.historyEvent);
+      if (reopenButton) reopenEvent(reopenButton.dataset.reopenEvent);
     });
     document.getElementById('closeHistoricalReport').addEventListener('click', () => {
       document.getElementById('historicalReportWrap').classList.add('is-hidden');
@@ -657,9 +660,9 @@
         <tr><td>${escapeHtml(formatDate(event.date))}</td><td>${escapeHtml(event.name)}</td>
         <td>${escapeHtml(event.type)}</td><td>${escapeHtml(event.local || '-')}</td>
         <td>${escapeHtml(event.createdBy || '-')}</td><td>${safeNumber(event.deviceCount)}</td>
-        <td>${event.status === 'finalizado'
-          ? `<button class="table-action" type="button" data-history-event="${escapeHtml(event.eventKey)}">Visualizar / PDF</button>`
-          : '<button class="table-action" type="button" disabled>Aguardando finalização</button>'}</td></tr>
+        <td><div class="history-actions">${event.status === 'finalizado'
+          ? `<button class="table-action" type="button" data-history-event="${escapeHtml(event.eventKey)}">Visualizar / PDF</button>${isManager() ? `<button class="table-action" type="button" data-reopen-event="${escapeHtml(event.eventKey)}">Reabrir</button>` : ''}`
+          : '<button class="table-action" type="button" disabled>Aguardando finalização</button>'}</div></td></tr>
       `).join('') : '<tr><td colspan="7">Nenhum evento encontrado.</td></tr>';
     } catch (error) {
       document.getElementById('eventHistoryBody').innerHTML = `<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
@@ -1453,6 +1456,7 @@
     const countStatus = document.getElementById('countEventStatus');
     const reportStatus = document.getElementById('reportEventStatus');
     const finalizeButton = document.getElementById('finalizeEventButton');
+    const reopenButton = document.getElementById('reopenEventButton');
     const reportTab = document.querySelector('[data-tab="report"]');
     const syncButton = document.querySelector('[data-action="sync-now"]');
     countStatus.classList.toggle('is-hidden', !finalized);
@@ -1467,6 +1471,7 @@
       : 'Relatório indisponível enquanto a contagem estiver em andamento.';
     finalizeButton.disabled = finalized || !state.selectedEventKey;
     finalizeButton.textContent = finalized ? 'Contagem encerrada' : 'Encerrar contagem do evento';
+    reopenButton.classList.toggle('is-hidden', !finalized || !isManager());
     reportTab.disabled = !finalized;
     syncButton.disabled = finalized;
   }
@@ -1489,6 +1494,28 @@
       await loadRemoteCounts(false);
       render();
       showToast('Contagem encerrada. O relatório final foi liberado.');
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+
+  async function reopenEvent(eventKey) {
+    if (!isManager() || !eventKey) return;
+    if (!window.confirm('Reabrir a contagem deste evento? Os contadores poderão voltar a alterar e sincronizar os números.')) return;
+    try {
+      const packet = await apiRequest(EVENTS_API_URL, {method:'POST', body:JSON.stringify({
+        action:'reopen', eventKey,
+      })});
+      if (state.selectedEventKey === eventKey) {
+        state.event.status = packet.status;
+        state.event.finalizedAt = null;
+        state.activeTab = 'count';
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        await loadRemoteCounts(false);
+      }
+      await loadAvailableEvents();
+      render();
+      showToast('Evento reaberto. A contagem foi liberada novamente.');
     } catch (error) {
       showToast(error.message);
     }

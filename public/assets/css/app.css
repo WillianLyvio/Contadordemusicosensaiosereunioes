@@ -481,6 +481,12 @@ button:disabled,
   color: #245336;
 }
 
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .section-heading {
   margin-bottom: 0;
 }

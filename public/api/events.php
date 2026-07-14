@@ -51,6 +51,18 @@ try {
         $db->prepare('DELETE FROM group_assignments WHERE event_key=:event_key')->execute(['event_key' => $eventKey]);
         jsonResponse(['ok' => true, 'status' => 'finalizado', 'finalizedAt' => $finalizedAt]);
     }
+    if (($body['action'] ?? '') === 'reopen') {
+        $eventKey = trim((string) ($body['eventKey'] ?? ''));
+        $statement = $db->prepare(
+            "UPDATE events SET status='em_andamento',finalized_at=NULL,finalized_by=NULL,updated_at=NOW()
+             WHERE event_key=:event_key AND status='finalizado' RETURNING id"
+        );
+        $statement->execute(['event_key' => $eventKey]);
+        if ($statement->fetchColumn() === false) {
+            jsonResponse(['ok' => false, 'message' => 'Evento não encontrado ou já está em andamento.'], 409);
+        }
+        jsonResponse(['ok' => true, 'status' => 'em_andamento']);
+    }
     $event = is_array($body['event'] ?? null) ? $body['event'] : [];
     $originalEventKey = trim((string) ($body['originalEventKey'] ?? ''));
     $types = ['Reunião de encarregados e instrutores', 'Ensaio Regional', 'Exames musicais'];
