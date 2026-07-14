@@ -8,6 +8,7 @@
   const AUTH_API_URL = 'api/auth.php';
   const USER_API_URL = 'api/users.php';
   const SYNC_API_URL = 'api/sync.php';
+  const ASSIGNMENTS_API_URL = 'api/assignments.php';
   const FALLBACK_USER_ACCOUNTS = [
     {
       username: 'admin',
@@ -177,14 +178,25 @@
   function bindAuth() {
     document.getElementById('loginUser').addEventListener('input', renderLoginGroupRequirement);
     document.getElementById('loginUser').addEventListener('change', renderLoginGroupRequirement);
+    document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
+      input.addEventListener('change', checkSelectedGroupAvailability);
+    });
 
     document.getElementById('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const username = normalizeUsername(document.getElementById('loginUser').value);
       const password = document.getElementById('loginPassword').value;
+      const requestedGroups = selectedLoginCountGroups();
       const response = await apiRequest(AUTH_API_URL, {
         method: 'POST',
-        body: JSON.stringify({username, password}),
+        body: JSON.stringify({
+          username,
+          password,
+          countGroups: requestedGroups,
+          event: state.event,
+          deviceId: state.deviceId,
+          deviceName: state.deviceName,
+        }),
       }).catch((error) => ({ok: false, message: error.message}));
 
       if (!response.ok || !response.user) {
@@ -193,7 +205,7 @@
         return;
       }
 
-      const countGroups = response.user.role === 'contador' ? selectedLoginCountGroups() : [];
+      const countGroups = response.user.role === 'contador' ? requestedGroups : [];
       if (response.user.role === 'contador' && countGroups.length === 0) {
         await apiRequest(AUTH_API_URL, {method: 'DELETE'}).catch(() => null);
         document.getElementById('loginError').textContent = 'Selecione ao menos um grupo para contagem.';
@@ -507,6 +519,27 @@
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
     } catch (error) {
       currentUser = null;
+    }
+  }
+
+  async function checkSelectedGroupAvailability() {
+    const groups = selectedLoginCountGroups();
+    const error = document.getElementById('loginError');
+    if (groups.length === 0) {
+      error.textContent = '';
+      return;
+    }
+    try {
+      const packet = await apiRequest(ASSIGNMENTS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({event: state.event, countGroups: groups}),
+      });
+      const conflicts = packet.conflicts || [];
+      error.textContent = conflicts.length
+        ? `Já em uso: ${conflicts.map((item) => `${groupLabel(item.groupId)} por ${item.userName}`).join(', ')}.`
+        : '';
+    } catch (requestError) {
+      error.textContent = requestError.message;
     }
   }
 
@@ -902,6 +935,7 @@
           deviceId: state.deviceId,
           deviceName: state.deviceName,
           counts: normalizeCounts(state.counts),
+          countGroups: currentUser.countGroups || [],
           updatedAt: new Date().toISOString(),
         }),
       });

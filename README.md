@@ -12,6 +12,8 @@ Sistema web responsivo em PHP, JavaScript e CSS para registrar contagens em vár
 6. A aba `Consolidar` mostra os demais aparelhos do evento.
 7. O relatório soma a contagem local com os registros recebidos do Neon e pode ser impresso ou salvo em PDF.
 
+Ao selecionar grupos no login, o sistema consulta reservas ativas no Neon. Um grupo já utilizado por outro usuário no mesmo evento é bloqueado e identifica o responsável. A reserva expira após cinco minutos sem sincronização e é liberada no logout.
+
 Não é mais necessário exportar ou importar arquivos JSON para consolidar a contagem.
 
 ## Requisitos

@@ -39,6 +39,10 @@ export default async function handler(request, response) {
         String(event.region || ''), user.id, deviceId, String(input.deviceName || ''), counts,
         String(input.updatedAt || new Date().toISOString()),
       ]);
+      await sql.query(`
+        UPDATE group_assignments SET expires_at=NOW()+INTERVAL '5 minutes', updated_at=NOW()
+        WHERE event_key=$1 AND user_id=$2 AND device_id=$3
+      `, [key, user.id, deviceId]);
       send(response, 200, {ok: true, eventKey: key});
       return;
     }

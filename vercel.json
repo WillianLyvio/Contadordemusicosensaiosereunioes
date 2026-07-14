@@ -6,6 +6,7 @@
     { "source": "/api/users.php", "destination": "/api/users" },
     { "source": "/api/sync.php", "destination": "/api/sync" },
     { "source": "/api/health.php", "destination": "/api/health" },
+    { "source": "/api/assignments.php", "destination": "/api/assignments" },
     { "source": "/", "destination": "/index.html" }
   ],
   "headers": [

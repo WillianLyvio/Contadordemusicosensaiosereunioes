@@ -60,6 +60,10 @@ try {
             'recorded_by' => $user['id'],
             'client_updated_at' => (string) ($body['updatedAt'] ?? gmdate('c')),
         ]);
+        $db->prepare(
+            "UPDATE group_assignments SET expires_at=NOW()+INTERVAL '5 minutes', updated_at=NOW()
+             WHERE event_key=:event_key AND user_id=:user_id AND device_id=:device_id"
+        )->execute(['event_key' => $eventKey, 'user_id' => $user['id'], 'device_id' => $deviceId]);
         $db->commit();
         jsonResponse(['ok' => true, 'eventKey' => $eventKey]);
     }

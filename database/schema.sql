@@ -54,4 +54,19 @@ CREATE TABLE IF NOT EXISTS access_logs (
 
 CREATE INDEX IF NOT EXISTS access_logs_created_at_idx ON access_logs (created_at DESC);
 
+CREATE TABLE IF NOT EXISTS group_assignments (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    event_key VARCHAR(64) NOT NULL,
+    group_id VARCHAR(40) NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_id VARCHAR(100) NOT NULL,
+    device_name VARCHAR(160) NOT NULL DEFAULT '',
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (event_key, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS group_assignments_expires_at_idx ON group_assignments (expires_at);
+
 COMMIT;
