@@ -681,7 +681,7 @@
       : [['Total de músicos',totals.totalMusicos],['Total de organistas',totals.totalOrganistas],['Músicos + organistas',totals.totalMusicosOrganistas],['Total geral',totals.totalGeralPresentes]];
     document.getElementById('historicalTotalsGrid').innerHTML = totalRows.map(([label,value]) => `<div class="total-card"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join('');
     document.getElementById('historicalTableGrid').innerHTML = catalogForEventType(event.type).map((group) => {
-      const rows = group.items.map(([itemId,label]) => `<tr><td>${escapeHtml(isInstructorMeetingType(event.type) ? `Instrutores - ${label}` : label)}</td><td>${safeNumber(counts[group.id]?.[itemId])}</td></tr>`).join('');
+      const rows = group.items.map(([itemId,label]) => `<tr><td>${escapeHtml(itemLabelForEvent(label, group.id, event.type))}</td><td>${safeNumber(counts[group.id]?.[itemId])}</td></tr>`).join('');
       return `<table class="report-table"><caption>${escapeHtml(group.label)}</caption><thead><tr><th>Item</th><th>Qtd.</th></tr></thead><tbody>${rows}<tr class="subtotal-row"><td>Subtotal</td><td>${groupSubtotal(counts,group.id)}</td></tr></tbody></table>`;
     }).join('');
   }
@@ -1310,10 +1310,6 @@
   }
 
   function catalogForEventType(eventType) {
-    if (isInstructorMeetingType(eventType)) {
-      return catalog.filter((group) => instrumentGroupIds.includes(group.id));
-    }
-
     return catalog;
   }
 
@@ -1348,12 +1344,16 @@
     return groupIds.map(groupLabel).join(', ');
   }
 
-  function itemLabelForCurrentEvent(label) {
-    if (isInstructorMeetingType(state.event.type)) {
+  function itemLabelForEvent(label, groupId, eventType) {
+    if (isInstructorMeetingType(eventType) && instrumentGroupIds.includes(groupId)) {
       return `Instrutores - ${label}`;
     }
 
     return label;
+  }
+
+  function itemLabelForCurrentEvent(label, groupId) {
+    return itemLabelForEvent(label, groupId, state.event.type);
   }
 
   function renderGroups() {
@@ -1385,7 +1385,7 @@
       const value = state.counts[group.id][itemId] || 0;
       return `
         <div class="counter-row">
-          <div class="counter-label">${escapeHtml(itemLabelForCurrentEvent(label))}</div>
+          <div class="counter-label">${escapeHtml(itemLabelForCurrentEvent(label, group.id))}</div>
           <button class="counter-button" type="button" data-delta="-1" data-group="${group.id}" data-item="${itemId}">-</button>
           <div class="counter-value">${value}</div>
           <button class="counter-button plus" type="button" data-delta="1" data-group="${group.id}" data-item="${itemId}">+</button>
@@ -1616,7 +1616,7 @@
     document.getElementById('tableGrid').innerHTML = activeCatalog().map((group) => {
       const rows = group.items.map(([itemId, label]) => `
         <tr>
-          <td>${escapeHtml(itemLabelForCurrentEvent(label))}</td>
+          <td>${escapeHtml(itemLabelForCurrentEvent(label, group.id))}</td>
           <td>${safeNumber(counts[group.id]?.[itemId])}</td>
         </tr>
       `).join('');
@@ -1838,14 +1838,18 @@
     if (isInstructorMeetingType(eventType)) {
       const totalInstrutores = instrumentGroupIds
         .reduce((sum, groupId) => sum + groupSubtotal(counts, groupId), 0);
+      const totalOrganistas = groupSubtotal(counts, 'organistas');
+      const totalMinisterioColaboradores =
+        groupSubtotal(counts, 'ministerios') + groupSubtotal(counts, 'parte_musical');
+      const totalOficializacao = groupSubtotal(counts, 'oficializacao');
 
       return {
         totalMusicos: totalInstrutores,
-        totalOrganistas: 0,
-        totalMusicosOrganistas: totalInstrutores,
-        totalMinisterioColaboradores: 0,
-        totalOficializacao: 0,
-        totalGeralPresentes: totalInstrutores,
+        totalOrganistas,
+        totalMusicosOrganistas: totalInstrutores + totalOrganistas,
+        totalMinisterioColaboradores,
+        totalOficializacao,
+        totalGeralPresentes: totalInstrutores + totalOrganistas + totalMinisterioColaboradores,
       };
     }
 
