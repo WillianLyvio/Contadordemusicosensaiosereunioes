@@ -9,13 +9,14 @@ export default async function handler(request, response) {
     const sql = database();
     if (request.method === 'GET') {
       const date = String(request.query.date || '').trim();
+      const upcoming = String(request.query.upcoming || '') === '1';
       const query = `
         SELECT e.id,e.event_key AS "eventKey",e.name,e.event_type AS type,e.event_date::text AS date,
                e.location AS local,e.regional_leader AS "regionalLeader",e.elder,e.region,
                e.created_at AS "createdAt",u.name AS "createdBy",COUNT(dc.id)::int AS "deviceCount"
         FROM events e LEFT JOIN users u ON u.id=e.created_by LEFT JOIN device_counts dc ON dc.event_id=e.id
-        ${date ? 'WHERE e.event_date=$1' : ''}
-        GROUP BY e.id,u.name ORDER BY e.event_date DESC,e.created_at DESC`;
+        ${date ? 'WHERE e.event_date=$1' : (upcoming ? 'WHERE e.event_date >= CURRENT_DATE' : '')}
+        GROUP BY e.id,u.name ORDER BY e.event_date ${upcoming ? 'ASC' : 'DESC'},e.created_at DESC`;
       const events = await sql.query(query, date ? [date] : []);
       send(response, 200, {ok: true, events});
       return;

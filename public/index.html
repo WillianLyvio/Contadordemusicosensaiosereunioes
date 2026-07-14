@@ -58,6 +58,7 @@
       <button class="tab" type="button" data-tab="count">Contagem</button>
       <button class="tab" type="button" data-tab="sync">Consolidar</button>
       <button class="tab" type="button" data-tab="report">Relatório</button>
+      <button class="tab" type="button" data-tab="agenda">Agenda</button>
       <button class="tab" type="button" data-tab="history">Histórico</button>
       <button class="tab admin-only" type="button" data-tab="admin">Admin</button>
     </nav>
@@ -162,6 +163,14 @@
             <table class="log-table"><thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Local</th><th>Criado por</th><th>Aparelhos</th></tr></thead><tbody id="eventHistoryBody"></tbody></table>
           </div>
         </article>
+      </section>
+
+      <section class="view" id="view-agenda">
+        <div class="section-heading">
+          <h1>Agenda de eventos</h1>
+          <p>Próximos eventos agendados, ordenados pela data mais próxima.</p>
+        </div>
+        <div class="agenda-list" id="eventAgendaList"></div>
       </section>
 
       <section class="view" id="view-count">

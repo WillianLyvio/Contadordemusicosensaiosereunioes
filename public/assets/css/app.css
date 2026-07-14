@@ -176,6 +176,56 @@ button {
   line-height: 1.4;
 }
 
+.agenda-list {
+  display: grid;
+  gap: 12px;
+}
+
+.agenda-item {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.agenda-date {
+  display: grid;
+  gap: 5px;
+  border-right: 1px solid var(--line);
+  padding-right: 16px;
+}
+
+.agenda-date strong {
+  font-size: 18px;
+}
+
+.agenda-date span,
+.agenda-details span,
+.agenda-details small {
+  color: var(--muted);
+}
+
+.agenda-details h2,
+.agenda-details p {
+  margin: 0 0 5px;
+}
+
+.agenda-details small {
+  display: block;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .agenda-item {
+    grid-template-columns: 1fr;
+  }
+  .agenda-date {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 10px;
+  }
+}
+
 .app-header {
   position: sticky;
   top: 0;

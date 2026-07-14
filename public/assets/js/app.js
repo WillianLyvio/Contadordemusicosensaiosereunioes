@@ -617,6 +617,32 @@
     }
   }
 
+  async function renderAgenda() {
+    if (!currentUser || state.activeTab !== 'agenda') return;
+    const list = document.getElementById('eventAgendaList');
+    try {
+      const packet = await apiRequest(`${EVENTS_API_URL}?upcoming=1`);
+      const events = packet.events || [];
+      list.innerHTML = events.length ? events.map((event) => {
+        const eventDate = new Date(`${event.date}T12:00:00`);
+        const todayDate = new Date(`${today()}T12:00:00`);
+        const days = Math.round((eventDate - todayDate) / 86400000);
+        const when = days === 0 ? 'Hoje' : (days === 1 ? 'Amanhã' : `Em ${days} dias`);
+        return `
+          <article class="panel agenda-item">
+            <div class="agenda-date"><strong>${escapeHtml(formatDate(event.date))}</strong><span>${escapeHtml(when)}</span></div>
+            <div class="agenda-details">
+              <h2>${escapeHtml(event.name)}</h2><p>${escapeHtml(event.type)}</p>
+              <span>${escapeHtml([event.local, event.region].filter(Boolean).join(' | ') || 'Local a definir')}</span>
+              <small>Agendado por ${escapeHtml(event.createdBy || '-')}</small>
+            </div>
+          </article>`;
+      }).join('') : '<article class="panel"><p class="muted">Nenhum evento futuro agendado.</p></article>';
+    } catch (error) {
+      list.innerHTML = `<article class="panel"><p class="muted">${escapeHtml(error.message)}</p></article>`;
+    }
+  }
+
   async function checkSelectedGroupAvailability() {
     const selectedGroups = selectedLoginCountGroups();
     const error = document.getElementById('selectionError');
@@ -1022,7 +1048,7 @@
       selectedGroup: availableGroups.some((group) => group.id === raw.selectedGroup)
         ? raw.selectedGroup
         : availableGroups[0].id,
-      activeTab: ['select-event', 'event', 'count', 'sync', 'report', 'history', 'admin'].includes(raw.activeTab)
+      activeTab: ['select-event', 'event', 'count', 'sync', 'report', 'agenda', 'history', 'admin'].includes(raw.activeTab)
         ? raw.activeTab
         : 'select-event',
     };
@@ -1126,6 +1152,7 @@
     renderSummary();
     renderImports();
     renderReport();
+    renderAgenda();
     renderAdmin();
   }
 

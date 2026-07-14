@@ -19,8 +19,11 @@ try {
         if ($date !== '') {
             $sql .= ' WHERE e.event_date=:date';
             $params['date'] = $date;
+        } elseif (($_GET['upcoming'] ?? '') === '1') {
+            $sql .= ' WHERE e.event_date >= CURRENT_DATE';
         }
-        $sql .= ' GROUP BY e.id,u.name ORDER BY e.event_date DESC,e.created_at DESC';
+        $direction = (($_GET['upcoming'] ?? '') === '1') ? 'ASC' : 'DESC';
+        $sql .= " GROUP BY e.id,u.name ORDER BY e.event_date $direction,e.created_at DESC";
         $statement = $db->prepare($sql);
         $statement->execute($params);
         jsonResponse(['ok' => true, 'events' => $statement->fetchAll()]);
