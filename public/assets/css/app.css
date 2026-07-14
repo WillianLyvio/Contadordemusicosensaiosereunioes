@@ -26,6 +26,7 @@
 html {
   min-height: 100%;
   background: var(--page);
+  overflow-x: hidden;
 }
 
 body {
@@ -34,6 +35,7 @@ body {
   background: var(--page);
   color: var(--text);
   line-height: 1.5;
+  overflow-x: hidden;
 }
 
 button,
@@ -407,7 +409,7 @@ button:disabled,
 
 .tabs {
   position: sticky;
-  top: 73px;
+  top: 81px;
   z-index: 15;
   display: flex;
   gap: 8px;
@@ -416,6 +418,8 @@ button:disabled,
   background: var(--page);
   border-bottom: 1px solid var(--line);
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
 }
 
 .tabs::-webkit-scrollbar {
@@ -431,6 +435,7 @@ button:disabled,
   color: var(--text);
   padding: 0 16px;
   font-weight: 800;
+  scroll-snap-align: start;
 }
 
 .tab:hover:not(.is-active) {
@@ -737,6 +742,14 @@ select:focus {
   margin-bottom: 12px;
 }
 
+.sync-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .file-picker {
   width: 100%;
   cursor: pointer;
@@ -850,6 +863,8 @@ select:focus {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
 }
 
 .log-table {
@@ -1106,7 +1121,10 @@ select:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .summary-strip,
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .totals-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1168,12 +1186,15 @@ select:focus {
   }
 
   .group-strip {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
-  .summary-strip,
+  .summary-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .totals-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 
   .table-grid {
@@ -1194,7 +1215,7 @@ select:focus {
   }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 700px) {
   .app-shell {
     width: 100%;
   }
@@ -1242,6 +1263,7 @@ select:focus {
   .tabs {
     top: 0;
     padding-block: 8px;
+    padding-inline: 12px;
   }
 
   .group-strip {
@@ -1258,6 +1280,29 @@ select:focus {
     padding: 14px;
   }
 
+  .sync-actions,
+  .report-actions,
+  .admin-actions,
+  .user-form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .sync-actions .button,
+  .report-actions .button,
+  .admin-actions .button,
+  .user-form-actions .button {
+    width: 100%;
+  }
+
+  .section-heading h1 {
+    font-size: clamp(24px, 8vw, 31px);
+  }
+
+  .log-table {
+    min-width: 680px;
+  }
+
   .report-header {
     align-items: flex-start;
   }
@@ -1265,6 +1310,29 @@ select:focus {
   .report-header img {
     width: 108px;
     height: 56px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-header {
+    padding-inline: 10px;
+  }
+
+  .header-actions {
+    grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+    gap: 4px;
+  }
+
+  .icon-button {
+    padding-inline: 8px;
+  }
+
+  .content {
+    padding-inline: 10px;
+  }
+
+  .counter-row {
+    padding: 10px;
   }
 }
 
