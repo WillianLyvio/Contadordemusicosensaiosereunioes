@@ -29,6 +29,7 @@
   let syncTimer = null;
   let syncInProgress = false;
   let availableEvents = [];
+  let historyEvents = [];
 
   const catalog = [
     {
@@ -528,6 +529,18 @@
     document.getElementById('confirmEventSelection').addEventListener('click', confirmEventSelection);
     document.getElementById('createEventButton').addEventListener('click', createEvent);
     document.getElementById('historyFilterDate').addEventListener('change', renderEventHistory);
+    document.getElementById('eventHistoryBody').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-history-event]');
+      if (button) viewHistoricalReport(button.dataset.historyEvent);
+    });
+    document.getElementById('closeHistoricalReport').addEventListener('click', () => {
+      document.getElementById('historicalReportWrap').classList.add('is-hidden');
+    });
+    document.getElementById('printHistoricalReport').addEventListener('click', () => {
+      document.body.classList.add('printing-history');
+      window.print();
+      window.setTimeout(() => document.body.classList.remove('printing-history'), 500);
+    });
   }
 
   async function loadAvailableEvents() {
@@ -607,14 +620,54 @@
     try {
       const packet = await apiRequest(`${EVENTS_API_URL}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
       const events = packet.events || [];
+      historyEvents = events;
       document.getElementById('eventHistoryBody').innerHTML = events.length ? events.map((event) => `
         <tr><td>${escapeHtml(formatDate(event.date))}</td><td>${escapeHtml(event.name)}</td>
         <td>${escapeHtml(event.type)}</td><td>${escapeHtml(event.local || '-')}</td>
-        <td>${escapeHtml(event.createdBy || '-')}</td><td>${safeNumber(event.deviceCount)}</td></tr>
-      `).join('') : '<tr><td colspan="6">Nenhum evento encontrado.</td></tr>';
+        <td>${escapeHtml(event.createdBy || '-')}</td><td>${safeNumber(event.deviceCount)}</td>
+        <td><button class="table-action" type="button" data-history-event="${escapeHtml(event.eventKey)}">Visualizar / PDF</button></td></tr>
+      `).join('') : '<tr><td colspan="7">Nenhum evento encontrado.</td></tr>';
     } catch (error) {
-      document.getElementById('eventHistoryBody').innerHTML = `<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;
+      document.getElementById('eventHistoryBody').innerHTML = `<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`;
     }
+  }
+
+  async function viewHistoricalReport(eventKey) {
+    const event = historyEvents.find((item) => item.eventKey === eventKey);
+    if (!event) return;
+    const query = new URLSearchParams({date:event.date,type:event.type,name:event.name,local:event.local || ''});
+    try {
+      const packet = await apiRequest(`${SYNC_API_URL}?${query}`);
+      const counts = emptyCounts();
+      (packet.devices || []).forEach((device) => {
+        const deviceCounts = normalizeCounts(device.counts);
+        catalog.forEach((group) => group.items.forEach(([itemId]) => {
+          counts[group.id][itemId] += safeNumber(deviceCounts[group.id][itemId]);
+        }));
+      });
+      renderHistoricalReport(event, counts, (packet.devices || []).length);
+      document.getElementById('historicalReportWrap').classList.remove('is-hidden');
+      document.getElementById('historicalReportWrap').scrollIntoView({behavior:'smooth',block:'start'});
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+
+  function renderHistoricalReport(event, counts, deviceCount) {
+    const totals = calculateTotals(counts, event.type);
+    document.getElementById('historicalReportSubtitle').textContent = [event.name,event.type,formatDate(event.date),event.local,event.region].filter(Boolean).join(' | ');
+    document.getElementById('historicalReportMeta').innerHTML = [
+      ['Evento',event.name],['Tipo',event.type],['Data',formatDate(event.date)],['Local',event.local || '-'],
+      ['Região',event.region || '-'],['Aparelhos consolidados',String(deviceCount)],['Criado por',event.createdBy || '-'],
+    ].map(([label,value]) => `<div class="meta-line"><strong>${escapeHtml(label)}:</strong><span>${escapeHtml(value)}</span></div>`).join('');
+    const totalRows = isInstructorMeetingType(event.type)
+      ? [['Total de instrutores',totals.totalMusicos],['Total geral',totals.totalGeralPresentes]]
+      : [['Total de músicos',totals.totalMusicos],['Total de organistas',totals.totalOrganistas],['Músicos + organistas',totals.totalMusicosOrganistas],['Total geral',totals.totalGeralPresentes]];
+    document.getElementById('historicalTotalsGrid').innerHTML = totalRows.map(([label,value]) => `<div class="total-card"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join('');
+    document.getElementById('historicalTableGrid').innerHTML = catalogForEventType(event.type).map((group) => {
+      const rows = group.items.map(([itemId,label]) => `<tr><td>${escapeHtml(isInstructorMeetingType(event.type) ? `Instrutores - ${label}` : label)}</td><td>${safeNumber(counts[group.id]?.[itemId])}</td></tr>`).join('');
+      return `<table class="report-table"><caption>${escapeHtml(group.label)}</caption><thead><tr><th>Item</th><th>Qtd.</th></tr></thead><tbody>${rows}<tr class="subtotal-row"><td>Subtotal</td><td>${groupSubtotal(counts,group.id)}</td></tr></tbody></table>`;
+    }).join('');
   }
 
   async function renderAgenda() {

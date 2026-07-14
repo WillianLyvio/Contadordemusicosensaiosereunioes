@@ -1163,6 +1163,24 @@ select:focus {
     display: block !important;
   }
 
+  body.printing-history #view-report {
+    display: none !important;
+  }
+
+  body.printing-history #view-history {
+    display: block !important;
+  }
+
+  body.printing-history #view-history > .section-heading,
+  body.printing-history #view-history > .panel,
+  body.printing-history .historical-report-wrap > .report-actions {
+    display: none !important;
+  }
+
+  body.printing-history .historical-report-wrap {
+    display: block !important;
+  }
+
   .report-sheet {
     border: 0;
     border-radius: 0;

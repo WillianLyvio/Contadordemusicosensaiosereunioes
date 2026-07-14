@@ -160,9 +160,25 @@
         <article class="panel">
           <div class="form-grid"><label><span>Filtrar por data</span><input id="historyFilterDate" type="date"></label></div>
           <div class="log-table-wrap">
-            <table class="log-table"><thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Local</th><th>Criado por</th><th>Aparelhos</th></tr></thead><tbody id="eventHistoryBody"></tbody></table>
+            <table class="log-table"><thead><tr><th>Data</th><th>Evento</th><th>Tipo</th><th>Local</th><th>Criado por</th><th>Aparelhos</th><th>Ação</th></tr></thead><tbody id="eventHistoryBody"></tbody></table>
           </div>
         </article>
+        <div class="historical-report-wrap is-hidden" id="historicalReportWrap">
+          <div class="report-actions no-print">
+            <button class="button primary" type="button" id="printHistoricalReport">Imprimir / Salvar PDF</button>
+            <button class="button subtle" type="button" id="closeHistoricalReport">Fechar visualização</button>
+          </div>
+          <article class="report-sheet" id="historicalReportSheet">
+            <header class="report-header">
+              <img src="assets/img/logo-ccb-light.svg?v=20260521-1520" alt="Congregação Cristã no Brasil">
+              <div><h2>Relatório Histórico de Músicos e Organistas</h2><p id="historicalReportSubtitle"></p></div>
+            </header>
+            <div class="report-meta" id="historicalReportMeta"></div>
+            <div class="totals-grid" id="historicalTotalsGrid"></div>
+            <section class="table-grid" id="historicalTableGrid"></section>
+            <footer class="report-footer"><strong>Consulta somente leitura:</strong> relatório consolidado armazenado no Neon.</footer>
+          </article>
+        </div>
       </section>
 
       <section class="view" id="view-agenda">
