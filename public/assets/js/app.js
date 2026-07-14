@@ -123,6 +123,17 @@
         ['organista', 'Organista'],
       ],
     },
+    {
+      id: 'resultados_exame',
+      label: 'Aprovados no exame',
+      items: [
+        ['irmas_organistas_aprovadas', 'Irmãs organistas aprovadas'],
+        ['irmaos_cordas_aprovados', 'Irmãos aprovados - Cordas'],
+        ['irmaos_teclas_aprovados', 'Irmãos aprovados - Teclas'],
+        ['irmaos_madeiras_aprovados', 'Irmãos aprovados - Madeiras'],
+        ['irmaos_metais_aprovados', 'Irmãos aprovados - Metais'],
+      ],
+    },
   ];
 
   const chartGroups = ['cordas', 'teclas', 'madeiras', 'metais'];
@@ -142,6 +153,7 @@
     'ministerios',
     'parte_musical',
     'oficializacao',
+    'resultados_exame',
   ];
 
   let state = loadState();
@@ -537,7 +549,10 @@
     document.getElementById('historyFilterDate').value = '';
     document.getElementById('selectionDeviceName').value = state.deviceName;
     filter.addEventListener('change', loadAvailableEvents);
-    document.getElementById('availableEventSelect').addEventListener('change', () => checkSelectedGroupAvailability());
+    document.getElementById('availableEventSelect').addEventListener('change', () => {
+      updateExamResultsOption();
+      checkSelectedGroupAvailability();
+    });
     document.querySelectorAll('[name="selectionCountGroups"]').forEach((input) => {
       input.addEventListener('change', checkSelectedGroupAvailability);
     });
@@ -574,6 +589,7 @@
       select.innerHTML = '<option value="">Selecione um evento</option>' + availableEvents.map((event) => (
         `<option value="${escapeHtml(event.eventKey)}">${escapeHtml(`${formatDate(event.date)} - ${event.name} - ${event.type}`)}</option>`
       )).join('');
+      updateExamResultsOption();
       await renderEventHistory();
     } catch (error) {
       document.getElementById('selectionError').textContent = error.message;
@@ -583,6 +599,15 @@
   function pendingSelectedEvent() {
     const key = document.getElementById('availableEventSelect')?.value;
     return availableEvents.find((event) => event.eventKey === key) || null;
+  }
+
+  function updateExamResultsOption() {
+    const option = document.getElementById('examResultsGroupOption');
+    const input = option.querySelector('input');
+    const isExam = pendingSelectedEvent()?.type === eventTypes[2];
+    option.classList.toggle('is-hidden', !isExam);
+    input.disabled = !isExam;
+    if (!isExam) input.checked = false;
   }
 
   async function confirmEventSelection() {
@@ -703,6 +728,7 @@
     const totalRows = isInstructorMeetingType(event.type)
       ? [['Total de instrutores',totals.totalMusicos],['Total geral',totals.totalGeralPresentes]]
       : [['Total de músicos',totals.totalMusicos],['Total de organistas',totals.totalOrganistas],['Músicos + organistas',totals.totalMusicosOrganistas],['Total geral',totals.totalGeralPresentes]];
+    if (isMusicalExamType(event.type)) totalRows.push(...examApprovalRows(totals));
     document.getElementById('historicalTotalsGrid').innerHTML = totalRows.map(([label,value]) => `<div class="total-card"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`).join('');
     document.getElementById('historicalTableGrid').innerHTML = catalogForEventType(event.type).map((group) => {
       const rows = group.items.map(([itemId,label]) => `<tr><td>${escapeHtml(itemLabelForEvent(label, group.id, event.type))}</td><td>${safeNumber(counts[group.id]?.[itemId])}</td></tr>`).join('');
@@ -1349,7 +1375,7 @@
   }
 
   function catalogForEventType(eventType) {
-    return catalog;
+    return catalog.filter((group) => group.id !== 'resultados_exame' || eventType === eventTypes[2]);
   }
 
   function activeCatalog() {
@@ -1366,6 +1392,22 @@
 
   function isInstructorMeetingType(eventType) {
     return eventType === eventTypes[0];
+  }
+
+  function isMusicalExamType(eventType) {
+    return eventType === eventTypes[2];
+  }
+
+  function examApprovalRows(totals) {
+    return [
+      ['Organistas aprovadas', totals.totalAprovadasOrganistas],
+      ['Aprovados em Cordas', totals.aprovadosCordas],
+      ['Aprovados em Teclas', totals.aprovadosTeclas],
+      ['Aprovados em Madeiras', totals.aprovadosMadeiras],
+      ['Aprovados em Metais', totals.aprovadosMetais],
+      ['Total de irmãos aprovados', totals.totalAprovadosIrmaos],
+      ['Total geral de aprovados', totals.totalGeralAprovados],
+    ];
   }
 
   function ensureSelectedGroup() {
@@ -1613,6 +1655,7 @@
       ['Total geral de presentes', totals.totalGeralPresentes],
     ];
 
+    if (isMusicalExamType(state.event.type)) totalRows.push(...examApprovalRows(totals));
     document.getElementById('totalsGrid').innerHTML = totalRows.map(([label, value]) => `
       <div class="total-card"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>
     `).join('');
@@ -1948,6 +1991,21 @@
   }
 
   function calculateTotals(counts, eventType = state.event.type) {
+    const totalAprovadasOrganistas = safeNumber(counts?.resultados_exame?.irmas_organistas_aprovadas);
+    const aprovadosCordas = safeNumber(counts?.resultados_exame?.irmaos_cordas_aprovados);
+    const aprovadosTeclas = safeNumber(counts?.resultados_exame?.irmaos_teclas_aprovados);
+    const aprovadosMadeiras = safeNumber(counts?.resultados_exame?.irmaos_madeiras_aprovados);
+    const aprovadosMetais = safeNumber(counts?.resultados_exame?.irmaos_metais_aprovados);
+    const totalAprovadosIrmaos = aprovadosCordas + aprovadosTeclas + aprovadosMadeiras + aprovadosMetais;
+    const approvalTotals = {
+      totalAprovadasOrganistas,
+      aprovadosCordas,
+      aprovadosTeclas,
+      aprovadosMadeiras,
+      aprovadosMetais,
+      totalAprovadosIrmaos,
+      totalGeralAprovados: totalAprovadasOrganistas + totalAprovadosIrmaos,
+    };
     if (isInstructorMeetingType(eventType)) {
       const totalInstrutores = instrumentGroupIds
         .reduce((sum, groupId) => sum + groupSubtotal(counts, groupId), 0);
@@ -1957,6 +2015,7 @@
       const totalOficializacao = groupSubtotal(counts, 'oficializacao');
 
       return {
+        ...approvalTotals,
         totalMusicos: totalInstrutores,
         totalOrganistas,
         totalMusicosOrganistas: totalInstrutores + totalOrganistas,
@@ -1974,6 +2033,7 @@
     const totalOficializacao = groupSubtotal(counts, 'oficializacao');
 
     return {
+      ...approvalTotals,
       totalMusicos,
       totalOrganistas,
       totalMusicosOrganistas: totalMusicos + totalOrganistas,
