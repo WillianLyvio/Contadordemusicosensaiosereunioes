@@ -201,7 +201,7 @@ select:focus-visible {
 
 .agenda-item {
   display: grid;
-  grid-template-columns: minmax(110px, 150px) 1fr;
+  grid-template-columns: minmax(110px, 150px) 1fr auto;
   gap: 18px;
   align-items: center;
 }
@@ -233,9 +233,21 @@ select:focus-visible {
   margin-top: 8px;
 }
 
+.agenda-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 @media (max-width: 560px) {
   .agenda-item {
     grid-template-columns: 1fr;
+  }
+  .agenda-actions {
+    justify-content: stretch;
+  }
+  .agenda-actions .button {
+    width: 100%;
   }
   .agenda-date {
     border-right: 0;

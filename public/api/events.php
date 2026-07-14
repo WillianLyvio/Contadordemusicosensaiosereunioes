@@ -34,11 +34,42 @@ try {
     }
     $body = jsonBody();
     $event = is_array($body['event'] ?? null) ? $body['event'] : [];
+    $originalEventKey = trim((string) ($body['originalEventKey'] ?? ''));
     $types = ['Reunião de encarregados e instrutores', 'Ensaio Regional', 'Exames musicais'];
     if (empty($event['name']) || empty($event['date']) || !in_array($event['type'] ?? '', $types, true)) {
         jsonResponse(['ok' => false, 'message' => 'Preencha nome, tipo e data do evento.'], 400);
     }
     $key = eventKeyForEvents($event);
+    if ($originalEventKey !== '') {
+        $db->beginTransaction();
+        $conflict = $db->prepare('SELECT 1 FROM events WHERE event_key=:key AND event_key<>:original');
+        $conflict->execute(['key' => $key, 'original' => $originalEventKey]);
+        if ($conflict->fetchColumn()) {
+            $db->rollBack();
+            jsonResponse(['ok' => false, 'message' => 'Já existe outro evento com esses mesmos dados.'], 409);
+        }
+        $statement = $db->prepare(
+            'UPDATE events SET event_key=:key,name=:name,event_type=:type,event_date=:date,location=:local,
+               regional_leader=:leader,elder=:elder,region=:region,updated_at=NOW()
+             WHERE event_key=:original AND event_date >= CURRENT_DATE AND CAST(:new_date_check AS date) >= CURRENT_DATE
+             RETURNING id'
+        );
+        $statement->execute([
+            'key'=>$key, 'name'=>trim((string)$event['name']), 'type'=>$event['type'], 'date'=>$event['date'],
+            'local'=>trim((string)($event['local'] ?? '')), 'leader'=>trim((string)($event['regionalLeader'] ?? '')),
+            'elder'=>trim((string)($event['elder'] ?? '')), 'region'=>trim((string)($event['region'] ?? '')),
+            'original'=>$originalEventKey, 'new_date_check'=>$event['date'],
+        ]);
+        $eventId = $statement->fetchColumn();
+        if ($eventId === false) {
+            $db->rollBack();
+            jsonResponse(['ok' => false, 'message' => 'Somente eventos que ainda não aconteceram podem ser editados.'], 409);
+        }
+        $assignment = $db->prepare('UPDATE group_assignments SET event_key=:key,updated_at=NOW() WHERE event_key=:original');
+        $assignment->execute(['key' => $key, 'original' => $originalEventKey]);
+        $db->commit();
+        jsonResponse(['ok'=>true,'eventKey'=>$key,'id'=>(int)$eventId,'updated'=>true]);
+    }
     $statement = $db->prepare(
         'INSERT INTO events (event_key,name,event_type,event_date,location,regional_leader,elder,region,created_by)
          VALUES (:key,:name,:type,:date,:local,:leader,:elder,:region,:user_id)

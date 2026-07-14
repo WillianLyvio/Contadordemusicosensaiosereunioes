@@ -30,6 +30,8 @@
   let syncInProgress = false;
   let availableEvents = [];
   let historyEvents = [];
+  let agendaEvents = [];
+  let editingEventKey = '';
 
   const catalog = [
     {
@@ -528,6 +530,10 @@
     });
     document.getElementById('confirmEventSelection').addEventListener('click', confirmEventSelection);
     document.getElementById('createEventButton').addEventListener('click', createEvent);
+    document.getElementById('eventAgendaList').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-edit-agenda-event]');
+      if (button) editAgendaEvent(button.dataset.editAgendaEvent);
+    });
     document.getElementById('historyFilterDate').addEventListener('change', renderEventHistory);
     document.getElementById('eventHistoryBody').addEventListener('click', (event) => {
       const button = event.target.closest('[data-history-event]');
@@ -604,10 +610,20 @@
   async function createEvent() {
     if (!isManager()) return;
     try {
-      await apiRequest(EVENTS_API_URL,{method:'POST',body:JSON.stringify({event:state.event})});
-      showToast('Evento salvo no Neon.');
+      const originalEventKey = editingEventKey;
+      const packet = await apiRequest(EVENTS_API_URL,{method:'POST',body:JSON.stringify({
+        event:state.event,
+        originalEventKey,
+      })});
+      if (originalEventKey && state.selectedEventKey === originalEventKey) {
+        state.selectedEventKey = packet.eventKey;
+      }
+      editingEventKey = '';
+      document.getElementById('createEventButton').textContent = 'Criar / atualizar evento';
+      showToast(originalEventKey ? 'Evento atualizado no Neon.' : 'Evento salvo no Neon.');
       await loadAvailableEvents();
-      state.activeTab = 'history';
+      state.activeTab = originalEventKey ? 'agenda' : 'history';
+      saveState();
       render();
     } catch (error) {
       showToast(error.message);
@@ -676,6 +692,7 @@
     try {
       const packet = await apiRequest(`${EVENTS_API_URL}?upcoming=1`);
       const events = packet.events || [];
+      agendaEvents = events;
       list.innerHTML = events.length ? events.map((event) => {
         const eventDate = new Date(`${event.date}T12:00:00`);
         const todayDate = new Date(`${today()}T12:00:00`);
@@ -689,11 +706,37 @@
               <span>${escapeHtml([event.local, event.region].filter(Boolean).join(' | ') || 'Local a definir')}</span>
               <small>Agendado por ${escapeHtml(event.createdBy || '-')}</small>
             </div>
+            ${isManager() ? `<div class="agenda-actions"><button class="button subtle" type="button" data-edit-agenda-event="${escapeHtml(event.eventKey)}">Editar evento</button></div>` : ''}
           </article>`;
       }).join('') : '<article class="panel"><p class="muted">Nenhum evento futuro agendado.</p></article>';
     } catch (error) {
       list.innerHTML = `<article class="panel"><p class="muted">${escapeHtml(error.message)}</p></article>`;
     }
+  }
+
+  function editAgendaEvent(eventKey) {
+    if (!isManager()) {
+      showToast('Somente Administrador ou Supervisor pode editar eventos.');
+      return;
+    }
+    const event = agendaEvents.find((item) => item.eventKey === eventKey);
+    if (!event) return;
+    editingEventKey = event.eventKey;
+    state.event = {
+      ...state.event,
+      name: event.name,
+      type: event.type,
+      date: event.date,
+      local: event.local || '',
+      regionalLeader: event.regionalLeader || '',
+      elder: event.elder || '',
+      region: event.region || '',
+    };
+    state.activeTab = 'event';
+    document.getElementById('createEventButton').textContent = 'Salvar alterações';
+    saveState();
+    render();
+    document.getElementById('view-event').scrollIntoView({behavior:'smooth',block:'start'});
   }
 
   async function checkSelectedGroupAvailability() {
