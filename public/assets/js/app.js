@@ -9,6 +9,7 @@
   const USER_API_URL = 'api/users.php';
   const SYNC_API_URL = 'api/sync.php';
   const ASSIGNMENTS_API_URL = 'api/assignments.php';
+  const EVENTS_API_URL = 'api/events.php';
   const FALLBACK_USER_ACCOUNTS = [
     {
       username: 'admin',
@@ -27,6 +28,7 @@
   let adminFilePassword = '';
   let syncTimer = null;
   let syncInProgress = false;
+  let availableEvents = [];
 
   const catalog = [
     {
@@ -125,6 +127,7 @@
   const eventTypes = [
     'Reunião de encarregados e instrutores',
     'Ensaio Regional',
+    'Exames musicais',
   ];
   const instrumentGroupIds = ['cordas', 'teclas', 'madeiras', 'metais'];
   const assignableGroupIds = [
@@ -151,10 +154,12 @@
     bindActions();
     bindInputs();
     bindUserManagement();
+    bindEventSelection();
     renderAuth();
     if (currentUser) {
       render();
-      await loadRemoteCounts(false);
+      await loadAvailableEvents();
+      if (state.selectedEventKey) await loadRemoteCounts(false);
     }
     registerServiceWorker();
   }
@@ -167,6 +172,16 @@
           showToast('Acesso permitido apenas para administrador.');
           return;
         }
+        if (button.dataset.tab === 'event' && !isManager()) {
+          showToast('Somente Administrador ou Supervisor pode criar eventos.');
+          return;
+        }
+        if (['count', 'sync', 'report'].includes(button.dataset.tab) && !state.selectedEventKey) {
+          showToast('Selecione um evento antes de iniciar a contagem.');
+          state.activeTab = 'select-event';
+          render();
+          return;
+        }
         state.activeTab = button.dataset.tab;
         saveState();
         writeAccessLog('open_tab', button.dataset.tab);
@@ -176,27 +191,13 @@
   }
 
   function bindAuth() {
-    document.getElementById('loginUser').addEventListener('input', renderLoginGroupRequirement);
-    document.getElementById('loginUser').addEventListener('change', renderLoginGroupRequirement);
-    document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
-      input.addEventListener('change', checkSelectedGroupAvailability);
-    });
-
     document.getElementById('loginForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const username = normalizeUsername(document.getElementById('loginUser').value);
       const password = document.getElementById('loginPassword').value;
-      const requestedGroups = selectedLoginCountGroups();
       const response = await apiRequest(AUTH_API_URL, {
         method: 'POST',
-        body: JSON.stringify({
-          username,
-          password,
-          countGroups: requestedGroups,
-          event: state.event,
-          deviceId: state.deviceId,
-          deviceName: state.deviceName,
-        }),
+        body: JSON.stringify({username, password}),
       }).catch((error) => ({ok: false, message: error.message}));
 
       if (!response.ok || !response.user) {
@@ -205,19 +206,11 @@
         return;
       }
 
-      const countGroups = requestedGroups;
-      if (response.user.role === 'contador' && countGroups.length === 0) {
-        await apiRequest(AUTH_API_URL, {method: 'DELETE'}).catch(() => null);
-        document.getElementById('loginError').textContent = 'Selecione ao menos um grupo para contagem.';
-        return;
-      }
-
-      currentUser = {...response.user, countGroups, loginAt: new Date().toISOString()};
+      currentUser = {...response.user, countGroups: [], loginAt: new Date().toISOString()};
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
-      if (currentUser.countGroups.length > 0) {
-        state.selectedGroup = currentUser.countGroups[0];
-        saveState();
-      }
+      state.activeTab = 'select-event';
+      state.selectedEventKey = '';
+      saveState();
       document.getElementById('loginError').textContent = '';
       writeAccessLog('login_success', currentUser.countGroups.length > 0
         ? `Entrada no sistema | Grupos: ${groupLabels(currentUser.countGroups)}`
@@ -225,19 +218,18 @@
       renderAuth();
       render();
       if (isAdmin()) await refreshProjectUserAccounts();
-      await loadRemoteCounts(false);
+      await loadAvailableEvents();
     });
   }
 
   function selectedLoginCountGroups() {
-    return Array.from(document.querySelectorAll('[name="loginCountGroups"]:checked'))
+    return Array.from(document.querySelectorAll('[name="selectionCountGroups"]:checked'))
       .map((input) => input.value)
       .filter((groupId) => assignableGroupIds.includes(groupId));
   }
 
   function renderLoginGroupRequirement() {
-    document.getElementById('loginGroupField').classList.remove('is-hidden');
-    checkSelectedGroupAvailability();
+    return null;
   }
 
   function bindActions() {
@@ -471,7 +463,7 @@
   }
 
   function normalizeRole(role) {
-    return role === 'administrador' ? 'administrador' : 'contador';
+    return ['administrador', 'supervisor'].includes(role) ? role : 'contador';
   }
 
   function normalizeCountGroups(value) {
@@ -523,19 +515,126 @@
     }
   }
 
+  function bindEventSelection() {
+    const filter = document.getElementById('eventFilterDate');
+    filter.value = today();
+    document.getElementById('historyFilterDate').value = '';
+    document.getElementById('selectionDeviceName').value = state.deviceName;
+    filter.addEventListener('change', loadAvailableEvents);
+    document.getElementById('availableEventSelect').addEventListener('change', () => checkSelectedGroupAvailability());
+    document.querySelectorAll('[name="selectionCountGroups"]').forEach((input) => {
+      input.addEventListener('change', checkSelectedGroupAvailability);
+    });
+    document.getElementById('confirmEventSelection').addEventListener('click', confirmEventSelection);
+    document.getElementById('createEventButton').addEventListener('click', createEvent);
+    document.getElementById('historyFilterDate').addEventListener('change', renderEventHistory);
+  }
+
+  async function loadAvailableEvents() {
+    if (!currentUser) return;
+    const date = document.getElementById('eventFilterDate')?.value || '';
+    try {
+      const packet = await apiRequest(`${EVENTS_API_URL}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
+      availableEvents = packet.events || [];
+      const select = document.getElementById('availableEventSelect');
+      select.innerHTML = '<option value="">Selecione um evento</option>' + availableEvents.map((event) => (
+        `<option value="${escapeHtml(event.eventKey)}">${escapeHtml(`${formatDate(event.date)} - ${event.name} - ${event.type}`)}</option>`
+      )).join('');
+      await renderEventHistory();
+    } catch (error) {
+      document.getElementById('selectionError').textContent = error.message;
+    }
+  }
+
+  function pendingSelectedEvent() {
+    const key = document.getElementById('availableEventSelect')?.value;
+    return availableEvents.find((event) => event.eventKey === key) || null;
+  }
+
+  async function confirmEventSelection() {
+    const event = pendingSelectedEvent();
+    const groups = selectedLoginCountGroups();
+    const deviceName = document.getElementById('selectionDeviceName').value.trim();
+    const error = document.getElementById('selectionError');
+    if (!event || groups.length === 0 || !deviceName) {
+      error.textContent = 'Selecione o evento, ao menos um grupo e informe o nome do aparelho.';
+      return;
+    }
+    try {
+      await apiRequest(ASSIGNMENTS_API_URL, {method:'POST',body:JSON.stringify({
+        action:'reserve',event,countGroups:groups,deviceId:state.deviceId,deviceName,
+      })});
+      if (state.selectedEventKey !== event.eventKey) {
+        state.counts = emptyCounts();
+        state.imports = {};
+      }
+      state.event = {...event};
+      state.selectedEventKey = event.eventKey;
+      state.deviceName = deviceName;
+      state.selectedGroup = groups[0];
+      state.activeTab = 'count';
+      currentUser.countGroups = groups;
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(currentUser));
+      saveState();
+      error.textContent = '';
+      render();
+      await loadRemoteCounts();
+      showToast('Evento e grupos selecionados. Contagem liberada.');
+    } catch (requestError) {
+      const message = requestError.message || 'Não foi possível reservar os grupos.';
+      error.textContent = message;
+      window.alert(message);
+      await checkSelectedGroupAvailability();
+    }
+  }
+
+  async function createEvent() {
+    if (!isManager()) return;
+    try {
+      await apiRequest(EVENTS_API_URL,{method:'POST',body:JSON.stringify({event:state.event})});
+      showToast('Evento salvo no Neon.');
+      await loadAvailableEvents();
+      state.activeTab = 'history';
+      render();
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
+
+  async function renderEventHistory() {
+    if (!currentUser) return;
+    const date = document.getElementById('historyFilterDate')?.value || '';
+    try {
+      const packet = await apiRequest(`${EVENTS_API_URL}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
+      const events = packet.events || [];
+      document.getElementById('eventHistoryBody').innerHTML = events.length ? events.map((event) => `
+        <tr><td>${escapeHtml(formatDate(event.date))}</td><td>${escapeHtml(event.name)}</td>
+        <td>${escapeHtml(event.type)}</td><td>${escapeHtml(event.local || '-')}</td>
+        <td>${escapeHtml(event.createdBy || '-')}</td><td>${safeNumber(event.deviceCount)}</td></tr>
+      `).join('') : '<tr><td colspan="6">Nenhum evento encontrado.</td></tr>';
+    } catch (error) {
+      document.getElementById('eventHistoryBody').innerHTML = `<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;
+    }
+  }
+
   async function checkSelectedGroupAvailability() {
     const selectedGroups = selectedLoginCountGroups();
-    const error = document.getElementById('loginError');
+    const error = document.getElementById('selectionError');
+    const event = pendingSelectedEvent();
+    if (!event) {
+      document.getElementById('groupAvailabilityMessage').textContent = 'Selecione um evento para verificar os grupos.';
+      return;
+    }
     try {
       const packet = await apiRequest(ASSIGNMENTS_API_URL, {
         method: 'POST',
-        body: JSON.stringify({event: state.event, countGroups: assignableGroupIds}),
+        body: JSON.stringify({event, countGroups: assignableGroupIds}),
       });
       const conflicts = packet.conflicts || [];
       const byGroup = new Map(conflicts.map((item) => [item.groupId, item]));
       const selectedConflicts = conflicts.filter((item) => selectedGroups.includes(item.groupId));
 
-      document.querySelectorAll('[name="loginCountGroups"]').forEach((input) => {
+      document.querySelectorAll('[name="selectionCountGroups"]').forEach((input) => {
         const conflict = byGroup.get(input.value);
         const label = input.closest('label');
         label.querySelector('.group-occupied-note')?.remove();
@@ -607,15 +706,26 @@
     document.querySelectorAll('.admin-only').forEach((element) => {
       element.classList.toggle('is-hidden', !isAdmin());
     });
+    document.querySelectorAll('.manager-only').forEach((element) => {
+      element.classList.toggle('is-hidden', !isManager());
+    });
 
     if (!isAdmin() && state.activeTab === 'admin') {
-      state.activeTab = 'event';
+      state.activeTab = 'select-event';
+      saveState();
+    }
+    if (!isManager() && state.activeTab === 'event') {
+      state.activeTab = 'select-event';
       saveState();
     }
   }
 
   function isAdmin() {
     return currentUser?.role === 'administrador';
+  }
+
+  function isManager() {
+    return ['administrador', 'supervisor'].includes(currentUser?.role);
   }
 
   function readAccessLogs() {
@@ -875,7 +985,8 @@
       schemaVersion: 1,
       deviceId: createId('device'),
       deviceName: 'Aparelho principal',
-      activeTab: 'event',
+      activeTab: 'select-event',
+      selectedEventKey: '',
       selectedGroup: 'cordas',
       event: {
         name: 'Contagem de Músicos e Organistas',
@@ -911,9 +1022,9 @@
       selectedGroup: availableGroups.some((group) => group.id === raw.selectedGroup)
         ? raw.selectedGroup
         : availableGroups[0].id,
-      activeTab: ['event', 'count', 'sync', 'report', 'admin'].includes(raw.activeTab)
+      activeTab: ['select-event', 'event', 'count', 'sync', 'report', 'history', 'admin'].includes(raw.activeTab)
         ? raw.activeTab
-        : 'event',
+        : 'select-event',
     };
   }
 
@@ -942,13 +1053,13 @@
   }
 
   function scheduleSynchronization() {
-    if (!currentUser) return;
+    if (!currentUser || !state.selectedEventKey || !currentUser.countGroups?.length) return;
     window.clearTimeout(syncTimer);
     syncTimer = window.setTimeout(() => synchronizeCounts(false), 900);
   }
 
   async function synchronizeCounts(showResult = false) {
-    if (!currentUser || syncInProgress || !state.event.date || !state.event.type) return;
+    if (!currentUser || !state.selectedEventKey || !currentUser.countGroups?.length || syncInProgress || !state.event.date || !state.event.type) return;
     syncInProgress = true;
     try {
       await apiRequest(SYNC_API_URL, {
@@ -1020,7 +1131,7 @@
 
   function renderTabs() {
     if (!isAdmin() && state.activeTab === 'admin') {
-      state.activeTab = 'event';
+      state.activeTab = 'select-event';
       saveState();
     }
 
@@ -1320,7 +1431,9 @@
   }
 
   function roleLabel(role) {
-    return role === 'administrador' ? 'Administrador' : 'Contador';
+    if (role === 'administrador') return 'Administrador';
+    if (role === 'supervisor') return 'Supervisor/Secretário';
+    return 'Contador';
   }
 
   function actionLabel(action) {

@@ -33,7 +33,8 @@ try {
 
     $originalUsername = strtolower(trim((string) ($body['originalUsername'] ?? $username)));
     $name = trim((string) ($body['name'] ?? ''));
-    $role = ($body['role'] ?? '') === 'administrador' ? 'administrador' : 'contador';
+    $role = in_array($body['role'] ?? '', ['administrador', 'supervisor'], true)
+        ? $body['role'] : 'contador';
     $password = (string) ($body['password'] ?? '');
 
     if (!preg_match('/^[a-z0-9._-]{3,80}$/', $username) || $name === '') {

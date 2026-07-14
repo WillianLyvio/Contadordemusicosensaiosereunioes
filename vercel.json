@@ -7,6 +7,7 @@
     { "source": "/api/sync.php", "destination": "/api/sync" },
     { "source": "/api/health.php", "destination": "/api/health" },
     { "source": "/api/assignments.php", "destination": "/api/assignments" },
+    { "source": "/api/events.php", "destination": "/api/events" },
     { "source": "/", "destination": "/index.html" }
   ],
   "headers": [

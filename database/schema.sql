@@ -69,4 +69,11 @@ CREATE TABLE IF NOT EXISTS group_assignments (
 
 CREATE INDEX IF NOT EXISTS group_assignments_expires_at_idx ON group_assignments (expires_at);
 
+DO $$ BEGIN
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+    ALTER TABLE users ADD CONSTRAINT users_role_check
+        CHECK (role IN ('administrador', 'supervisor', 'contador'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 COMMIT;

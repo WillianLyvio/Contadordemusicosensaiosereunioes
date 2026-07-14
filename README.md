@@ -4,15 +4,18 @@ Sistema web responsivo em PHP, JavaScript e CSS para registrar contagens em vár
 
 ## Fluxo atual
 
-1. O usuário entra com uma conta armazenada no Neon.
-2. Todos os aparelhos preenchem os mesmos dados do evento: data, tipo, nome e local.
-3. Cada aparelho registra sua parte da contagem.
-4. As alterações ficam no `localStorage` e são sincronizadas automaticamente com o Neon.
-5. O banco mantém uma contagem por evento e aparelho; uma nova sincronização substitui a versão anterior do mesmo aparelho.
-6. A aba `Consolidar` mostra os demais aparelhos do evento.
-7. O relatório soma a contagem local com os registros recebidos do Neon e pode ser impresso ou salvo em PDF.
+1. O usuário entra com uma conta armazenada no Neon, sem escolher grupos na tela de login.
+2. Administradores e Supervisores/Secretários criam os eventos oficiais.
+3. O contador filtra a data, seleciona um evento existente e escolhe os grupos disponíveis.
+4. Cada aparelho registra sua parte da contagem.
+5. As alterações ficam no `localStorage` e são sincronizadas automaticamente com o Neon.
+6. O banco mantém uma contagem por evento e aparelho; uma nova sincronização substitui a versão anterior do mesmo aparelho.
+7. A aba `Consolidar` mostra os demais aparelhos do evento.
+8. O relatório soma a contagem local com os registros recebidos do Neon e pode ser impresso ou salvo em PDF.
 
-Ao selecionar grupos no login, o sistema consulta reservas ativas no Neon. Um grupo já utilizado por outro usuário no mesmo evento é bloqueado e identifica o responsável. A reserva expira após cinco minutos sem sincronização e é liberada no logout.
+Ao selecionar grupos depois da autenticação, o sistema consulta reservas ativas no Neon. Um grupo já utilizado por outro usuário no mesmo evento é bloqueado e identifica o responsável. A reserva expira após cinco minutos sem sincronização e é liberada no logout.
+
+Tipos de evento: Reunião de encarregados e instrutores, Ensaio Regional e Exames musicais. A aba Histórico lista os eventos registrados, criador e quantidade de aparelhos participantes.
 
 Não é mais necessário exportar ou importar arquivos JSON para consolidar a contagem.
 

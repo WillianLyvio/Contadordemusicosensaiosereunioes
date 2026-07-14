@@ -25,7 +25,7 @@ export default async function handler(request, response) {
     }
     const original = String(input.originalUsername || username).trim().toLowerCase();
     const name = String(input.name || '').trim();
-    const role = input.role === 'administrador' ? 'administrador' : 'contador';
+    const role = ['administrador', 'supervisor'].includes(input.role) ? input.role : 'contador';
     const password = String(input.password || '');
     if (!/^[a-z0-9._-]{3,80}$/.test(username) || !name) {
       send(response, 400, {ok: false, message: 'Dados do usuário inválidos.'});
