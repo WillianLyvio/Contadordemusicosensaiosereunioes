@@ -1,0 +1,9 @@
+.env
+.env.*
+.neon
+config/
+database/
+docs/
+server-*.log
+public/api/*.php
+public/data/users.json

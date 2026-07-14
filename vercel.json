@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/api/auth.php", "destination": "/api/auth" },
+    { "source": "/api/users.php", "destination": "/api/users" },
+    { "source": "/api/sync.php", "destination": "/api/sync" },
+    { "source": "/api/health.php", "destination": "/api/health" },
+    { "source": "/", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    }
+  ]
+}

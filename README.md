@@ -66,3 +66,14 @@ php -S 127.0.0.1:8790 -t public
 ```
 
 Depois acesse `http://127.0.0.1:8790`.
+
+## Publicação na Vercel
+
+O projeto mantém as APIs PHP para execução local e possui funções Node.js equivalentes em `api/` para a Vercel. A publicação usa o driver HTTP oficial do Neon.
+
+No projeto da Vercel conectado a este repositório, configure para os ambientes Production e Preview:
+
+- `DATABASE_URL`: cadeia de conexão pooled da branch `production` do Neon;
+- `SESSION_SECRET`: valor aleatório com pelo menos 32 caracteres.
+
+Use o preset `Other`, mantenha o diretório raiz do repositório e não configure um Output Directory manual. O arquivo `vercel.json` publica automaticamente o conteúdo de `public/` e encaminha as rotas PHP usadas pelo frontend para as funções Node.js.
