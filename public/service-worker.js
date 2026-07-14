@@ -1,4 +1,4 @@
-const CACHE_NAME = 'contador-musicos-web-v26';
+const CACHE_NAME = 'contador-musicos-web-v27';
 const ASSETS = [
   './',
   './index.html',

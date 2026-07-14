@@ -69,7 +69,7 @@
           <h1>Selecionar evento para contagem</h1>
           <p>Filtre pela data, escolha um evento criado e depois selecione os grupos que você contará.</p>
         </div>
-        <article class="panel">
+        <article class="panel event-selection-panel">
           <div class="form-grid">
             <label><span>Data do evento</span><input id="eventFilterDate" type="date"></label>
             <label><span>Evento</span><select id="availableEventSelect"><option value="">Selecione um evento</option></select></label>
@@ -89,8 +89,10 @@
             </div>
             <div class="group-availability-message" id="groupAvailabilityMessage" aria-live="polite"></div>
           </fieldset>
-          <button class="button primary" type="button" id="confirmEventSelection">Iniciar contagem</button>
-          <div class="login-error" id="selectionError" role="alert"></div>
+          <div class="event-selection-actions">
+            <button class="button primary" type="button" id="confirmEventSelection">Iniciar contagem</button>
+            <div class="login-error" id="selectionError" role="alert"></div>
+          </div>
         </article>
       </section>
 

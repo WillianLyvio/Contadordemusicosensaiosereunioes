@@ -194,6 +194,22 @@ select:focus-visible {
   line-height: 1.4;
 }
 
+.event-selection-panel .login-group-field {
+  margin-top: 16px;
+}
+
+.event-selection-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.event-selection-actions .login-error {
+  flex: 1;
+  padding-top: 10px;
+}
+
 .agenda-list {
   display: grid;
   gap: 12px;
@@ -240,6 +256,15 @@ select:focus-visible {
 }
 
 @media (max-width: 560px) {
+  .event-selection-actions {
+    display: grid;
+  }
+  .event-selection-actions .button {
+    width: 100%;
+  }
+  .event-selection-actions .login-error {
+    padding-top: 0;
+  }
   .agenda-item {
     grid-template-columns: 1fr;
   }
